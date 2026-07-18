@@ -1,0 +1,145 @@
+options:
+  auto_refresh: true
+
+scenarios:
+  - name: "Sequential numbering within the same year, reset on year change"
+    steps:
+      - step: "Create first document dated early 2026"
+        action: "create"
+        model: "test.mixin_sequence_number"
+        save_as: "doc_1"
+        values:
+          date: 2026-01-05
+
+      - step: "First document gets TEST/2026/00001"
+        action: "assert"
+        target: "doc_1"
+        asserts:
+          name:
+            type: "value"
+            expected: "TEST/2026/00001"
+          sequence_prefix:
+            type: "value"
+            expected: "TEST/2026/"
+          sequence_number:
+            type: "value"
+            expected: 1
+
+      - step: "Create second document dated later in 2026"
+        action: "create"
+        model: "test.mixin_sequence_number"
+        save_as: "doc_2"
+        values:
+          date: 2026-02-10
+
+      - step: "Second document continues the same year's sequence"
+        action: "assert"
+        target: "doc_2"
+        asserts:
+          name:
+            type: "value"
+            expected: "TEST/2026/00002"
+          sequence_number:
+            type: "value"
+            expected: 2
+
+      - step: "Create third document dated even later in 2026"
+        action: "create"
+        model: "test.mixin_sequence_number"
+        save_as: "doc_3"
+        values:
+          date: 2026-03-15
+
+      - step: "Third document continues the same year's sequence"
+        action: "assert"
+        target: "doc_3"
+        asserts:
+          name:
+            type: "value"
+            expected: "TEST/2026/00003"
+          sequence_number:
+            type: "value"
+            expected: 3
+
+      - step: "Create fourth document dated in the following year"
+        action: "create"
+        model: "test.mixin_sequence_number"
+        save_as: "doc_4"
+        values:
+          date: 2027-01-05
+
+      - step: "Fourth document resets to 00001 under the new year's prefix"
+        action: "assert"
+        target: "doc_4"
+        asserts:
+          name:
+            type: "value"
+            expected: "TEST/2027/00001"
+          sequence_prefix:
+            type: "value"
+            expected: "TEST/2027/"
+          sequence_number:
+            type: "value"
+            expected: 1
+
+  - name: "Rejects a document whose number does not match its own date"
+    steps:
+      - step: "Create a valid 2026 document"
+        action: "create"
+        model: "test.mixin_sequence_number"
+        save_as: "doc"
+        values:
+          name: "TEST/2026/00005"
+          date: 2026-08-01
+
+      - step: "Moving its date into the following year is rejected"
+        action: "write"
+        target: "doc"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "is not aligned with the existing document number"
+        values:
+          date: 2027-03-01
+
+  - name: "Rejects renumbering a document to a number that does not match its date"
+    steps:
+      - step: "Create a valid 2026 document"
+        action: "create"
+        model: "test.mixin_sequence_number"
+        save_as: "doc"
+        values:
+          name: "TEST/2026/00007"
+          date: 2026-08-01
+
+      - step: "Renumbering it to a year that does not match its date is rejected"
+        action: "write"
+        target: "doc"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "is not aligned with the existing document number"
+        values:
+          name: "TEST/2099/00001"
+
+  - name: "Editing an already-numbered document without changing name/date is allowed"
+    steps:
+      - step: "Create a valid 2026 document"
+        action: "create"
+        model: "test.mixin_sequence_number"
+        save_as: "doc"
+        values:
+          name: "TEST/2026/00009"
+          date: 2026-08-01
+
+      - step: "A field unrelated to numbering can still be written"
+        action: "write"
+        target: "doc"
+        values:
+          date: 2026-08-02
+
+      - step: "The document keeps its own (still-matching) date"
+        action: "assert"
+        target: "doc"
+        asserts:
+          date:
+            type: "value"
+            expected: 2026-08-02
