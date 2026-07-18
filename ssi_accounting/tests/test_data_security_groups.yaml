@@ -20,14 +20,14 @@ scenarios:
         action: "assert"
         target: "group_user"
         asserts:
-          category_id.name:
+          privilege_id.category_id.name:
             type: "value"
             expected: "Accounting"
       - step: "Assert kategori group Accounting Manager"
         action: "assert"
         target: "group_manager"
         asserts:
-          category_id.name:
+          privilege_id.category_id.name:
             type: "value"
             expected: "Accounting"
 
