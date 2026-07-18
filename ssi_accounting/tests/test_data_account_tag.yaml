@@ -1,0 +1,75 @@
+scenarios:
+  - name: "Applicability defaults to accounts"
+    steps:
+      - step: "Create tag without specifying applicability"
+        action: "create"
+        model: "account.tag"
+        save_as: "tag_default"
+        values:
+          name: "Bank"
+      - step: "Assert default applicability"
+        action: "assert"
+        target: "tag_default"
+        asserts:
+          applicability:
+            type: "value"
+            expected: "accounts"
+
+  - name: "Tax grid tag display name shows a sign prefix"
+    steps:
+      - step: "Create a taxes tag whose name has no sign"
+        action: "create"
+        model: "account.tag"
+        save_as: "tag_tax"
+        values:
+          name: "036"
+          applicability: "taxes"
+      - step: "Assert a '+' prefix is shown"
+        action: "assert"
+        target: "tag_tax"
+        asserts:
+          display_name:
+            type: "value"
+            expected: "+036"
+      - step: "Create a taxes tag whose name already has a sign"
+        action: "create"
+        model: "account.tag"
+        save_as: "tag_tax_negative"
+        values:
+          name: "-036"
+          applicability: "taxes"
+      - step: "Assert the existing sign is kept as-is"
+        action: "assert"
+        target: "tag_tax_negative"
+        asserts:
+          display_name:
+            type: "value"
+            expected: "-036"
+
+  - name: "Duplicate name/applicability/country is rejected"
+    steps:
+      - step: "Create the first tag"
+        action: "create"
+        model: "account.tag"
+        save_as: "tag_dup_1"
+        values:
+          name: "Operating"
+      - step: "Create a second tag with the same name is rejected"
+        action: "create"
+        model: "account.tag"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "already exists"
+        values:
+          name: "Operating"
+
+  - name: "Applicability only allows accounts and taxes"
+    steps:
+      - step: "products is not an allowed applicability value"
+        action: "create"
+        model: "account.tag"
+        expect_error:
+          type: "ValueError"
+        values:
+          name: "Bad Tag"
+          applicability: "products"

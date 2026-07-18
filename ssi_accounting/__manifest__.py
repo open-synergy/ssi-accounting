@@ -21,5 +21,10 @@
     "data": [
         "security/ssi_accounting_security.xml",
         "security/ir.model.access.csv",
+        "security/ir_rule/account_group.xml",
+        "menu.xml",
+        "views/account_group_views.xml",
+        "views/account_tag_views.xml",
+        "views/res_company_views.xml",
     ],
 }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <menuitem
+        id="menu_accounting_root"
+        name="Accounting"
+        web_icon="ssi_accounting,static/description/icon.png"
+    />
+
+    <menuitem
+        id="menu_accounting_configuration"
+        name="Configuration"
+        parent="menu_accounting_root"
+        sequence="99"
+    />
+</odoo>

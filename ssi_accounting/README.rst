@@ -10,8 +10,11 @@ Core accounting module for PT. Simetri Sinergi Indonesia (SSI). This module buil
 pure journal entry accounting core, independent of Odoo's native ``account`` module —
 it does not depend on, and will never depend on, the ``account`` addon.
 
-This unit only lays down the module skeleton and its own security groups. Models,
-views, and menus are added incrementally by later units.
+This unit lays down the module skeleton, its own security groups, and the first
+chart-of-accounts support models (``account.root``, ``account.group``,
+``account.tag``) plus phase-1 accounting configuration on ``res.company`` and a
+deactivation guard on ``res.currency``. The ``account`` model itself, and the rest
+of the chart of accounts, are added incrementally by later units.
 
 
 Design decisions
@@ -26,11 +29,47 @@ Design decisions
 
   - ``group_accounting_user`` — implies ``base.group_user``. Accountants need this
     group to create and post journal entries.
-  - ``group_accounting_manager`` — implies ``group_accounting_user``. Reserved for
-    users who may additionally configure the chart of accounts, journals, and taxes
-    once those models exist.
+  - ``group_accounting_manager`` — implies ``group_accounting_user``. Grants full
+    access to the chart-of-accounts configuration models added in this unit
+    (``account.group``, ``account.tag``), and will keep doing so for journals and
+    taxes once those models exist.
 
   Both groups belong to the ``Accounting`` module category.
+* ``account.root``, ``account.group`` are ported (behaviour-wise) from Odoo core's
+  ``account`` module, since ``ssi_accounting`` cannot depend on it. They keep their
+  upstream ``_name`` (dotted, e.g. ``account.group``) rather than the SSI
+  underscore-only model naming convention, so that any future code written against
+  vanilla Odoo's chart-of-accounts API keeps working unmodified against this module.
+  ``account.root`` is a computed, tableless model (``_auto = False``) and therefore
+  has no ``ir.model.access``, no ``ir.rule``, and no menu entry.
+* ``account.tag`` is a **renamed** port of upstream ``account.account.tag``
+  (renamed to follow the same short naming convention as ``account.root`` /
+  ``account.group``), with ``applicability`` reduced to ``accounts``/``taxes``
+  (upstream's ``products`` value is dropped — no product-tax relationship in this
+  repo's scope), and with ``report_expression_id``/``balance_negate`` and the whole
+  ``account.report`` integration dropped entirely. **Consequence:** once
+  ``tax.repartition_line.tag_ids`` exists in a later unit, it will be a plain grid
+  tag without any report-derived sign semantics — the "+"/"-" prefix shown by
+  ``display_name`` for tax tags is a self-contained heuristic (based on whether the
+  tag's own name already starts with a sign), not derived from a report expression.
+* ``account.group._adapt_accounts_for_account_groups`` (kept from upstream to keep
+  ``account.account.group_id`` in sync with the group hierarchy) is a no-op while
+  ``account.account`` does not exist yet — it starts working automatically once that
+  model is added in a later unit, no further change needed here.
+* ``res.company`` gains six phase-1 accounting fields: ``account_price_include``,
+  ``tax_calculation_rounding_method``, ``fiscalyear_last_day``,
+  ``fiscalyear_last_month``, ``fiscalyear_lock_date``, ``tax_lock_date``. Lock dates
+  are intentionally reduced to these two (of upstream's five) — ``sale_lock_date``,
+  ``purchase_lock_date`` and ``hard_lock_date`` are dropped because this repo has no
+  sale/purchase documents and no hard-lock requirement (yet). Exchange difference
+  fields are deliberately **not** added here — they will follow once ``journal``
+  exists.
+* ``res.currency`` is inherited only to add ``_has_accounting_entries()`` and a
+  ``write()`` guard that refuses to deactivate a currency already used on journal
+  items. Unlike upstream (which guards a rounding-precision decrease), this guard
+  specifically blocks **deactivation**. It reads ``account.move.line``, which does
+  not exist yet in this repo's scope, so the guard is a no-op (deactivation always
+  succeeds) until that model is added alongside ``journal``.
 
 
 Installation

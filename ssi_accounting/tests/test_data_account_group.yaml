@@ -1,0 +1,73 @@
+scenarios:
+  - name: "Create a two-level account group hierarchy with prefix auto-fill"
+    steps:
+      - step: "Create root group with only a starting prefix"
+        action: "create"
+        model: "account.group"
+        save_as: "parent_group"
+        values:
+          name: "Assets"
+          code_prefix_start: "1"
+      - step: "code_prefix_end is auto-filled from code_prefix_start"
+        action: "assert"
+        target: "parent_group"
+        asserts:
+          code_prefix_end:
+            type: "value"
+            expected: "1"
+      - step: "Create a narrower child group nested under the root group"
+        action: "create"
+        model: "account.group"
+        save_as: "child_group"
+        values:
+          name: "Current Assets"
+          code_prefix_start: "10"
+          code_prefix_end: "19"
+      - step: "Child group's parent is auto-assigned to the root group"
+        action: "assert"
+        target: "child_group"
+        asserts:
+          parent_id:
+            type: "m2o"
+            expected: "REC: parent_group"
+      - step: "Materialized hierarchy path is populated"
+        action: "assert"
+        target: "child_group"
+        asserts:
+          parent_path:
+            type: "value"
+            operator: "is_truthy"
+
+  - name: "Overlapping prefix range of the same length is rejected"
+    steps:
+      - step: "Create first group covering 50-59"
+        action: "create"
+        model: "account.group"
+        save_as: "group_c"
+        values:
+          name: "Group C"
+          code_prefix_start: "50"
+          code_prefix_end: "59"
+      - step: "Second group overlapping 55-59 is rejected"
+        action: "create"
+        model: "account.group"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "overlap"
+        values:
+          name: "Group D"
+          code_prefix_start: "55"
+          code_prefix_end: "65"
+
+  - name: "Mismatched prefix length is rejected with an SSI-formatted error"
+    steps:
+      - step: "Starting prefix longer than ending prefix is rejected"
+        action: "create"
+        model: "account.group"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "length"
+        values:
+          name: "Group E"
+          code_prefix_start: "100"
+          code_prefix_end: "19"

@@ -1,0 +1,23 @@
+scenarios:
+  - name: "Deactivating a currency without accounting entries succeeds"
+    steps:
+      - step: "Create a new currency"
+        action: "create"
+        model: "res.currency"
+        save_as: "new_currency"
+        values:
+          name: "ZZZ"
+          symbol: "Z"
+          rounding: 0.01
+      - step: "Deactivate the currency"
+        action: "write"
+        target: "new_currency"
+        values:
+          active: false
+      - step: "Assert the currency is now inactive"
+        action: "assert"
+        target: "new_currency"
+        asserts:
+          active:
+            type: "value"
+            operator: "is_falsy"
