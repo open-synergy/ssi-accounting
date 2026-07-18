@@ -34,7 +34,6 @@ class TestMixinSequenceNumber(models.Model):
         copy=False,
     )
     date = fields.Date(
-        string="Date",
         required=True,
         default=fields.Date.context_today,
     )
@@ -44,7 +43,7 @@ class TestMixinSequenceNumber(models.Model):
         # accounting year so `_deduce_sequence_number_reset` detects a
         # yearly reset from the very first record.
         self.ensure_one()
-        return "TEST/%04d/00000" % (self.date.year,)
+        return f"TEST/{self.date.year:04d}/00000"
 
     def _get_last_sequence_domain(self, relaxed=False):
         # EXTENDS mixin.sequence_number: scope the search for the
@@ -66,7 +65,9 @@ class TestMixinSequenceNumber(models.Model):
             ]
             reference_name = (
                 self.sudo()
-                .search(domain + [("date", "<=", self.date)], order="date desc", limit=1)
+                .search(
+                    domain + [("date", "<=", self.date)], order="date desc", limit=1
+                )
                 .name
             )
             if not reference_name:

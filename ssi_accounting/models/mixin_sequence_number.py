@@ -9,7 +9,7 @@ from datetime import date
 
 from psycopg2 import errors as pgerrors
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 from odoo.tools import SQL, date_utils, frozendict, index_exists
 from odoo.tools.misc import format_date
@@ -202,7 +202,9 @@ class MixinSequenceNumber(models.AbstractModel):
         return True
 
     def _year_match(self, format_value, year):
-        return format_value == self._truncate_year_to_length(year, len(str(format_value)))
+        return format_value == self._truncate_year_to_length(
+            year, len(str(format_value))
+        )
 
     def _truncate_year_to_length(self, year, length):
         return year % (10**length)
@@ -256,24 +258,28 @@ class MixinSequenceNumber(models.AbstractModel):
                 and record_date > constraint_date
                 and not record._sequence_matches_date()
             ):
-                error_message = """
-Document Type: %s
+                date_field_label = record._fields[
+                    record._sequence_date_field
+                ]._description_string(self.env)
+                raise ValidationError(
+                    self.env._(
+                        """
+Document Type: %(document_type)s
 Context: Validate document number against its accounting date
-Database ID: %s
-Problem: %s (%s) is not aligned with the existing document number (%s)
+Database ID: %(database_id)s
+Problem: %(date_field)s (%(date)s)
+is not aligned with the existing document number (%(sequence)s)
 Solution: Clear the document number, or select the affected entries and
 use the resequence option from the actions menu (developer mode) to
 realign the numbering with the dates
-""" % (
-                    record._description,
-                    record.id,
-                    record._fields[
-                        record._sequence_date_field
-                    ]._description_string(self.env),
-                    format_date(self.env, record_date),
-                    sequence,
+""",
+                        document_type=record._description,
+                        database_id=record.id,
+                        date_field=date_field_label,
+                        date=format_date(self.env, record_date),
+                        sequence=sequence,
+                    )
                 )
-                raise ValidationError(_(error_message))
 
     @api.depends(lambda self: [self._sequence_field])
     def _compute_split_sequence(self):
@@ -330,7 +336,7 @@ realign the numbering with the dates
                 if all(groupdict.get(req) is not None for req in requirements):
                     return ret_val
         raise ValidationError(
-            _(
+            self.env._(
                 "The sequence regex should at least contain the seq "
                 "grouping keys. For instance:\n"
                 r"^(?P<prefix1>.*?)(?P<seq>\d*)(?P<suffix>\D*?)$"
@@ -410,7 +416,9 @@ realign the numbering with the dates
             self._sequence_field not in self._fields
             or not self._fields[self._sequence_field].store
         ):
-            raise ValidationError(_("%s is not a stored field", self._sequence_field))
+            raise ValidationError(
+                self.env._("%s is not a stored field", self._sequence_field)
+            )
         where_string, param = self._get_last_sequence_domain(relaxed)
         if self._origin.id:
             where_string += " AND id != %(id)s "
@@ -488,7 +496,7 @@ realign the numbering with the dates
                         else (
                             "{year_end:0{year_end_length}d}"
                             if s == "year_end"
-                            else "{%s}" % s
+                            else f"{{{s}}}"
                         )
                     )
                 )
@@ -593,9 +601,9 @@ realign the numbering with the dates
         format_string, format_values = self._get_next_sequence_format()
 
         sequence = self._locked_increment(format_string, format_values)
-        self.with_context(clear_sequence_mixin_cache=False)[
-            self._sequence_field
-        ] = sequence
+        self.with_context(clear_sequence_mixin_cache=False)[self._sequence_field] = (
+            sequence
+        )
 
         registry = self.env.registry
         triggers = registry._field_triggers[self._fields[self._sequence_field]]

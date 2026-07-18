@@ -30,9 +30,7 @@ class TestMixinSequenceNumber(YamlTransactionCase):
         efek samping pada record yang bisa di-assert lewat YAML.
         """
         model = self.env["test.mixin_sequence_number"]
-        self.assertEqual(
-            model._deduce_sequence_number_reset("TEST/2026/00001"), "year"
-        )
+        self.assertEqual(model._deduce_sequence_number_reset("TEST/2026/00001"), "year")
         self.assertEqual(
             model._deduce_sequence_number_reset("TEST/2026/01/00001"), "month"
         )
