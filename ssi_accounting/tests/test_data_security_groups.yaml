@@ -1,0 +1,92 @@
+setup:
+  steps:
+    - step: "Ambil group Accounting User"
+      action: "ref"
+      xml_id: "ssi_accounting.group_accounting_user"
+      save_as: "group_user"
+    - step: "Ambil group Accounting Manager"
+      action: "ref"
+      xml_id: "ssi_accounting.group_accounting_manager"
+      save_as: "group_manager"
+    - step: "Ambil group base.group_user"
+      action: "ref"
+      xml_id: "base.group_user"
+      save_as: "base_group_user"
+
+scenarios:
+  - name: "Kedua group berada di bawah kategori Accounting"
+    steps:
+      - step: "Assert kategori group Accounting User"
+        action: "assert"
+        target: "group_user"
+        asserts:
+          privilege_id.category_id.name:
+            type: "value"
+            expected: "Accounting"
+      - step: "Assert kategori group Accounting Manager"
+        action: "assert"
+        target: "group_manager"
+        asserts:
+          privilege_id.category_id.name:
+            type: "value"
+            expected: "Accounting"
+
+  - name: "Accounting Manager mewarisi Accounting User yang mewarisi base.group_user"
+    steps:
+      - step: "Assert Accounting Manager implied Accounting User"
+        action: "assert"
+        target: "group_manager"
+        asserts:
+          implied_ids:
+            type: "m2m"
+            check: "contains"
+            expected_records:
+              - "REC: group_user"
+      - step: "Assert Accounting User implied base.group_user"
+        action: "assert"
+        target: "group_user"
+        asserts:
+          implied_ids:
+            type: "m2m"
+            check: "contains"
+            expected_records:
+              - "REC: base_group_user"
+
+  - name:
+      "User yang diberi group Accounting Manager otomatis memiliki group Accounting User"
+    steps:
+      - step: "Create user dengan group Accounting Manager"
+        action: "create"
+        model: "res.users"
+        save_as: "new_user"
+        values:
+          name: "Accounting Manager Test"
+          login: "accounting_manager_test@example.com"
+          group_ids: "REC: group_manager"
+      - step: "Assert user memiliki group Accounting Manager secara eksplisit"
+        action: "assert"
+        target: "new_user"
+        asserts:
+          group_ids:
+            type: "m2m"
+            check: "contains"
+            expected_records:
+              - "REC: group_manager"
+      - step: "Assert user otomatis memiliki group Accounting User (implied)"
+        action: "assert"
+        target: "new_user"
+        asserts:
+          all_group_ids:
+            type: "m2m"
+            check: "contains"
+            expected_records:
+              - "REC: group_user"
+      - step: "Assert user otomatis memiliki base.group_user (implied transitif)"
+        action: "assert"
+        target: "new_user"
+        asserts:
+          all_group_ids:
+            type: "m2m"
+            check: "contains"
+            expected_records:
+              - "REC: base_group_user"
