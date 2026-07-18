@@ -41,7 +41,10 @@ Design decisions
   underscore-only model naming convention, so that any future code written against
   vanilla Odoo's chart-of-accounts API keeps working unmodified against this module.
   ``account.root`` is a computed, tableless model (``_auto = False``) and therefore
-  has no ``ir.model.access``, no ``ir.rule``, and no menu entry.
+  has no ``ir.rule`` and no menu entry. It still gets one read-only
+  ``ir.model.access`` row (matching what upstream Odoo ships for it), because
+  Odoo's module loader logs a warning -- treated as a CI failure by this repo's
+  strict log checking -- for any model with zero access rules.
 * ``account.tag`` is a **renamed** port of upstream ``account.account.tag``
   (renamed to follow the same short naming convention as ``account.root`` /
   ``account.group``), with ``applicability`` reduced to ``accounts``/``taxes``
