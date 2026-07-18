@@ -32,16 +32,18 @@ class ResCurrency(models.Model):
         if "active" in vals and not vals["active"]:
             for record in self:
                 if record._has_accounting_entries():
-                    error_message = """
+                    raise UserError(
+                        record.env._(
+                            """
 Context: Deactivate currency
-Database ID: %s
+Database ID: %(database_id)s
 Problem: This currency has already been used to make accounting entries
 Solution: Keep the currency active, or first remove/reassign the
     journal items using it
-""" % (
-                        record.id,
+""",
+                            database_id=record.id,
+                        )
                     )
-                    raise UserError(self.env._(error_message))
         return super().write(vals)
 
     def _has_accounting_entries(self):

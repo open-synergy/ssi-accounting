@@ -46,8 +46,7 @@ class AccountGroup(models.Model):
     name = fields.Char(
         required=True,
         translate=True,
-        help="Label of the account group, shown together with its code "
-        "prefix range.",
+        help="Label of the account group, shown together with its code prefix range.",
     )
     code_prefix_start = fields.Char(
         string="From Code Prefix",
@@ -98,19 +97,21 @@ class AccountGroup(models.Model):
     def _check_code_prefix_length(self):
         for group in self.sudo():
             if not group._check_code_prefix_length_condition():
-                error_message = """
+                raise ValidationError(
+                    group.env._(
+                        """
 Context: Save account group
-Database ID: %s
-Problem: Starting code prefix "%s" and ending code prefix "%s" do not
-    have the same length
+Database ID: %(database_id)s
+Problem: Starting code prefix "%(start)s" and ending code prefix
+    "%(end)s" do not have the same length
 Solution: Make sure both code prefixes have the same number of
     characters
-""" % (
-                    group.id,
-                    group.code_prefix_start,
-                    group.code_prefix_end,
+""",
+                        database_id=group.id,
+                        start=group.code_prefix_start,
+                        end=group.code_prefix_end,
+                    )
                 )
-                raise ValidationError(self.env._(error_message))
 
     def _check_code_prefix_length_condition(self):
         self.ensure_one()
@@ -131,32 +132,37 @@ Solution: Make sure both code prefixes have the same number of
         self.flush_model()
         for group in self.sudo():
             if not group._constraint_prefix_overlap_condition():
-                error_message = """
+                raise ValidationError(
+                    group.env._(
+                        """
 Context: Save account group
-Database ID: %s
-Problem: Code prefix range %s-%s overlaps with another account group of
-    the same length in the same company
+Database ID: %(database_id)s
+Problem: Code prefix range %(start)s-%(end)s overlaps with another
+    account group of the same length in the same company
 Solution: Adjust the code prefix range so it does not overlap with an
     existing account group
-""" % (
-                    group.id,
-                    group.code_prefix_start,
-                    group.code_prefix_end,
+""",
+                        database_id=group.id,
+                        start=group.code_prefix_start,
+                        end=group.code_prefix_end,
+                    )
                 )
-                raise ValidationError(self.env._(error_message))
 
     def _constraint_prefix_overlap_condition(self):
         self.ensure_one()
         query = """
             SELECT other.id FROM account_group this
             JOIN account_group other
-              ON char_length(other.code_prefix_start) = char_length(this.code_prefix_start)
+              ON char_length(other.code_prefix_start)
+                 = char_length(this.code_prefix_start)
              AND other.id != this.id
              AND other.company_id = this.company_id
              AND (
-                other.code_prefix_start <= this.code_prefix_start AND this.code_prefix_start <= other.code_prefix_end
+                other.code_prefix_start <= this.code_prefix_start
+                AND this.code_prefix_start <= other.code_prefix_end
                 OR
-                other.code_prefix_start >= this.code_prefix_start AND this.code_prefix_end >= other.code_prefix_start
+                other.code_prefix_start >= this.code_prefix_start
+                AND this.code_prefix_end >= other.code_prefix_start
             )
             WHERE this.id = %(id)s
         """
@@ -182,16 +188,18 @@ Solution: Adjust the code prefix range so it does not overlap with an
     def _check_parent_not_circular(self):
         for group in self.sudo():
             if not group._check_parent_not_circular_condition():
-                error_message = """
+                raise ValidationError(
+                    group.env._(
+                        """
 Context: Save account group
-Database ID: %s
+Database ID: %(database_id)s
 Problem: The parent group hierarchy is recursive
 Solution: Pick a parent group that is not one of this group's own
     descendants
-""" % (
-                    group.id,
+""",
+                        database_id=group.id,
+                    )
                 )
-                raise ValidationError(self.env._(error_message))
 
     def _check_parent_not_circular_condition(self):
         self.ensure_one()
@@ -234,9 +242,7 @@ Solution: Pick a parent group that is not one of this group's own
         """
         if "account.account" not in self.env:
             return
-        company_ids = (
-            account_ids.company_id.ids if account_ids else self.company_id.ids
-        )
+        company_ids = account_ids.company_id.ids if account_ids else self.company_id.ids
         account_ids = account_ids.ids if account_ids else []
         if not company_ids and not account_ids:
             return
@@ -254,11 +260,17 @@ Solution: Pick a parent group that is not one of this group's own
             WITH candidates_account_groups AS (
                 SELECT
                     account.id AS account_id,
-                    ARRAY_AGG(agroup.id ORDER BY char_length(agroup.code_prefix_start) DESC, agroup.id) AS group_ids
+                    ARRAY_AGG(
+                        agroup.id
+                        ORDER BY char_length(agroup.code_prefix_start) DESC,
+                                 agroup.id
+                    ) AS group_ids
                 FROM account_account account
                 LEFT JOIN account_group agroup
-                    ON agroup.code_prefix_start <= LEFT(account.code, char_length(agroup.code_prefix_start))
-                    AND agroup.code_prefix_end >= LEFT(account.code, char_length(agroup.code_prefix_end))
+                    ON agroup.code_prefix_start
+                       <= LEFT(account.code, char_length(agroup.code_prefix_start))
+                    AND agroup.code_prefix_end
+                        >= LEFT(account.code, char_length(agroup.code_prefix_end))
                     AND agroup.company_id = account.company_id
                 WHERE account.company_id IN %s {account_where_clause}
                 GROUP BY account.id
@@ -283,13 +295,22 @@ Solution: Pick a parent group that is not one of this group's own
         self.env["account.group"].flush_model()
         query = """
             WITH relation AS (
-       SELECT DISTINCT FIRST_VALUE(parent.id) OVER (PARTITION BY child.id ORDER BY child.id, char_length(parent.code_prefix_start) DESC) AS parent_id,
+                SELECT DISTINCT FIRST_VALUE(parent.id) OVER (
+                           PARTITION BY child.id
+                           ORDER BY child.id,
+                                    char_length(parent.code_prefix_start) DESC
+                       ) AS parent_id,
                        child.id AS child_id
                   FROM account_group parent
                   JOIN account_group child
-                    ON char_length(parent.code_prefix_start) < char_length(child.code_prefix_start)
-                   AND parent.code_prefix_start <= LEFT(child.code_prefix_start, char_length(parent.code_prefix_start))
-                   AND parent.code_prefix_end >= LEFT(child.code_prefix_end, char_length(parent.code_prefix_end))
+                    ON char_length(parent.code_prefix_start)
+                       < char_length(child.code_prefix_start)
+                   AND parent.code_prefix_start
+                       <= LEFT(child.code_prefix_start,
+                               char_length(parent.code_prefix_start))
+                   AND parent.code_prefix_end
+                       >= LEFT(child.code_prefix_end,
+                               char_length(parent.code_prefix_end))
                    AND parent.id != child.id
                    AND parent.company_id = child.company_id
                  WHERE child.company_id IN %(company_ids)s

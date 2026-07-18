@@ -59,9 +59,7 @@ class AccountRoot(models.Model):
                 return self.browse(
                     sorted({s for _id in ids for s in accumulate(_id)})
                 )._as_query()
-        raise UserError(
-            self.env._("Filter on the Account or its Display Name instead")
-        )
+        raise UserError(self.env._("Filter on the Account or its Display Name instead"))
 
     @api.model
     def _from_account_code(self, code):

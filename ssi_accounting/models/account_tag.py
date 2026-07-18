@@ -46,24 +46,20 @@ class AccountTag(models.Model):
         selection=[("accounts", "Accounts"), ("taxes", "Taxes")],
         required=True,
         default="accounts",
-        help="Where this tag can be applied: on accounts, or on tax grid "
-        "lines.",
+        help="Where this tag can be applied: on accounts, or on tax grid lines.",
     )
     color = fields.Integer(
         string="Color Index",
-        help="Color index used to display this tag as a colored badge in "
-        "the UI.",
+        help="Color index used to display this tag as a colored badge in the UI.",
     )
     active = fields.Boolean(
         default=True,
-        help="Set active to false to hide the account tag without "
-        "removing it.",
+        help="Set active to false to hide the account tag without removing it.",
     )
     country_id = fields.Many2one(
         string="Country",
         comodel_name="res.country",
-        help="Country for which this tag is available, when applied on "
-        "taxes.",
+        help="Country for which this tag is available, when applied on taxes.",
     )
 
     @api.depends("name", "applicability")
@@ -82,17 +78,19 @@ class AccountTag(models.Model):
     def _check_duplicate_name(self):
         for tag in self.sudo():
             if not tag._check_duplicate_name_condition():
-                error_message = """
+                raise ValidationError(
+                    tag.env._(
+                        """
 Context: Save account tag
-Database ID: %s
+Database ID: %(database_id)s
 Problem: Another account tag with the same name, applicability and
     country already exists
 Solution: Choose a different name or applicability, or clear the
     country for a tag available to every country
-""" % (
-                    tag.id,
+""",
+                        database_id=tag.id,
+                    )
                 )
-                raise ValidationError(self.env._(error_message))
 
     def _check_duplicate_name_condition(self):
         self.ensure_one()
