@@ -1,0 +1,551 @@
+options:
+  auto_refresh: true
+
+scenarios:
+  - name: "Create My Master (account) - CRUD"
+    steps:
+      - step: "Create account"
+        action: "create"
+        model: "account.account"
+        save_as: "master"
+        values:
+          name: "Test Master"
+          account_type: "asset_current"
+          code: "900001"
+      - step: "Assert created"
+        action: "assert"
+        target: "master"
+        asserts:
+          id:
+            type: "value"
+            operator: "is_truthy"
+          name:
+            type: "value"
+            expected: "Test Master"
+          code:
+            type: "value"
+            expected: "900001"
+
+  - name: "Edit account name and code"
+    steps:
+      - step: "Create account"
+        action: "create"
+        model: "account.account"
+        save_as: "master"
+        values:
+          name: "Original Name"
+          account_type: "asset_current"
+          code: "900002"
+      - step: "Write new name and code"
+        action: "write"
+        target: "master"
+        values:
+          name: "Updated Name"
+          code: "900003"
+      - step: "Assert updated"
+        action: "assert"
+        target: "master"
+        asserts:
+          name:
+            type: "value"
+            expected: "Updated Name"
+          code:
+            type: "value"
+            expected: "900003"
+
+  - name: "Archive account"
+    steps:
+      - step: "Create account"
+        action: "create"
+        model: "account.account"
+        save_as: "master"
+        values:
+          name: "To Archive"
+          account_type: "asset_current"
+          code: "900004"
+      - step: "Archive it"
+        action: "write"
+        target: "master"
+        values:
+          active: false
+      - step: "Assert archived"
+        action: "assert"
+        target: "master"
+        asserts:
+          active:
+            type: "value"
+            operator: "is_falsy"
+
+  - name: "Delete an unused account"
+    steps:
+      - step: "Create account"
+        action: "create"
+        model: "account.account"
+        save_as: "master"
+        values:
+          name: "To Delete"
+          account_type: "asset_current"
+          code: "900005"
+      - step: "Delete it"
+        action: "unlink"
+        target: "master"
+      - step: "Verify deleted"
+        action: "search"
+        model: "account.account"
+        domain: [["code", "=", "900005"]]
+        save_as: "result"
+        expect_count: 0
+
+  - name: "internal_group is derived from every account_type value"
+    steps:
+      - step: "asset_receivable -> asset"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_1"
+        values: { name: "Receivable", account_type: "asset_receivable", code: "110001" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_1"
+        asserts: { internal_group: { type: "value", expected: "asset" } }
+
+      - step: "asset_cash -> asset"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_2"
+        values: { name: "Cash", account_type: "asset_cash", code: "110002" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_2"
+        asserts: { internal_group: { type: "value", expected: "asset" } }
+
+      - step: "asset_current -> asset"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_3"
+        values: { name: "Current Asset", account_type: "asset_current", code: "110003" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_3"
+        asserts: { internal_group: { type: "value", expected: "asset" } }
+
+      - step: "asset_non_current -> asset"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_4"
+        values:
+          { name: "Non-current Asset", account_type: "asset_non_current", code: "110004" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_4"
+        asserts: { internal_group: { type: "value", expected: "asset" } }
+
+      - step: "asset_prepayments -> asset"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_5"
+        values: { name: "Prepayments", account_type: "asset_prepayments", code: "110005" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_5"
+        asserts: { internal_group: { type: "value", expected: "asset" } }
+
+      - step: "asset_fixed -> asset"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_6"
+        values: { name: "Fixed Asset", account_type: "asset_fixed", code: "110006" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_6"
+        asserts: { internal_group: { type: "value", expected: "asset" } }
+
+      - step: "liability_payable -> liability"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_7"
+        values: { name: "Payable", account_type: "liability_payable", code: "210001" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_7"
+        asserts: { internal_group: { type: "value", expected: "liability" } }
+
+      - step: "liability_credit_card -> liability"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_8"
+        values:
+          { name: "Credit Card", account_type: "liability_credit_card", code: "210002" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_8"
+        asserts: { internal_group: { type: "value", expected: "liability" } }
+
+      - step: "liability_current -> liability"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_9"
+        values:
+          {
+            name: "Current Liability",
+            account_type: "liability_current",
+            code: "210003",
+          }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_9"
+        asserts: { internal_group: { type: "value", expected: "liability" } }
+
+      - step: "liability_non_current -> liability"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_10"
+        values:
+          {
+            name: "Non-current Liability",
+            account_type: "liability_non_current",
+            code: "210004",
+          }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_10"
+        asserts: { internal_group: { type: "value", expected: "liability" } }
+
+      - step: "equity -> equity"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_11"
+        values: { name: "Equity", account_type: "equity", code: "310001" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_11"
+        asserts: { internal_group: { type: "value", expected: "equity" } }
+
+      - step: "equity_unaffected -> equity"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_12"
+        values:
+          {
+            name: "Current Year Earnings",
+            account_type: "equity_unaffected",
+            code: "310002",
+          }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_12"
+        asserts: { internal_group: { type: "value", expected: "equity" } }
+
+      - step: "income -> income"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_13"
+        values: { name: "Income", account_type: "income", code: "410001" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_13"
+        asserts: { internal_group: { type: "value", expected: "income" } }
+
+      - step: "income_other -> income"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_14"
+        values: { name: "Other Income", account_type: "income_other", code: "410002" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_14"
+        asserts: { internal_group: { type: "value", expected: "income" } }
+
+      - step: "expense -> expense"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_15"
+        values: { name: "Expense", account_type: "expense", code: "510001" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_15"
+        asserts: { internal_group: { type: "value", expected: "expense" } }
+
+      - step: "expense_other -> expense"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_16"
+        values: { name: "Other Expense", account_type: "expense_other", code: "510002" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_16"
+        asserts: { internal_group: { type: "value", expected: "expense" } }
+
+      - step: "expense_depreciation -> expense"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_17"
+        values:
+          { name: "Depreciation", account_type: "expense_depreciation", code: "510003" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_17"
+        asserts: { internal_group: { type: "value", expected: "expense" } }
+
+      - step: "expense_direct_cost -> expense"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_18"
+        values:
+          {
+            name: "Cost of Revenue",
+            account_type: "expense_direct_cost",
+            code: "510004",
+          }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_18"
+        asserts: { internal_group: { type: "value", expected: "expense" } }
+
+      - step: "off_balance -> off"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_19"
+        values: { name: "Off Balance", account_type: "off_balance", code: "910001" }
+      - action: "assert"
+        step: "assert internal_group"
+        target: "acc_19"
+        asserts: { internal_group: { type: "value", expected: "off" } }
+
+  - name: "reconcile defaults follow account_type"
+    steps:
+      - step: "Create receivable account"
+        action: "create"
+        model: "account.account"
+        save_as: "receivable"
+        values: { name: "Receivable", account_type: "asset_receivable", code: "120001" }
+      - step: "Assert reconcile is True for receivable"
+        action: "assert"
+        target: "receivable"
+        asserts: { reconcile: { type: "value", expected: true } }
+      - step: "Create income account"
+        action: "create"
+        model: "account.account"
+        save_as: "income_acc"
+        values: { name: "Income", account_type: "income", code: "420001" }
+      - step: "Assert reconcile is False for income"
+        action: "assert"
+        target: "income_acc"
+        asserts: { reconcile: { type: "value", expected: false } }
+
+  - name: "include_initial_balance is False for income/expense/equity_unaffected"
+    steps:
+      - step: "Create income account"
+        action: "create"
+        model: "account.account"
+        save_as: "income_acc"
+        values: { name: "Income", account_type: "income", code: "420002" }
+      - step: "Assert include_initial_balance is False"
+        action: "assert"
+        target: "income_acc"
+        asserts: { include_initial_balance: { type: "value", expected: false } }
+      - step: "Create current asset account"
+        action: "create"
+        model: "account.account"
+        save_as: "asset_acc"
+        values: { name: "Current Asset", account_type: "asset_current", code: "120002" }
+      - step: "Assert include_initial_balance is True"
+        action: "assert"
+        target: "asset_acc"
+        asserts: { include_initial_balance: { type: "value", expected: true } }
+
+  - name: "used, current_balance and company_currency_id on a fresh account"
+    steps:
+      - step: "Create a fresh account with no journal items"
+        action: "create"
+        model: "account.account"
+        save_as: "fresh_acc"
+        values: { name: "Fresh Account", account_type: "asset_current", code: "930001" }
+      - step: "Assert used is False (no journal items exist yet)"
+        action: "assert"
+        target: "fresh_acc"
+        asserts:
+          used:
+            type: "value"
+            expected: false
+      - step: "Assert current_balance is zero"
+        action: "assert"
+        target: "fresh_acc"
+        asserts:
+          current_balance:
+            type: "value"
+            expected: 0.0
+      - step: "Assert company_currency_id matches the active company's currency"
+        action: "assert"
+        target: "fresh_acc"
+        asserts:
+          company_currency_id:
+            type: "m2o"
+            expected: "REC: company.currency_id"
+
+  - name: "group_id and root_id are derived from the account code prefix"
+    steps:
+      - step: "Create account group covering prefix 1 (Assets)"
+        action: "create"
+        model: "account.group"
+        save_as: "group_assets"
+        values:
+          name: "Assets"
+          code_prefix_start: "1"
+          code_prefix_end: "1"
+      - step: "Create account whose code starts with 1"
+        action: "create"
+        model: "account.account"
+        save_as: "asset_acc"
+        values:
+          name: "Cash equivalents"
+          account_type: "asset_current"
+          code: "101000"
+      - step: "Assert group_id matches the account group"
+        action: "assert"
+        target: "asset_acc"
+        asserts:
+          group_id:
+            type: "m2o"
+            expected: "REC: group_assets"
+      - step: "Assert root_id is the first two digits of the code"
+        action: "assert"
+        target: "asset_acc"
+        asserts:
+          root_id.id:
+            type: "value"
+            expected: "10"
+
+  - name: "Multi-company: one account can have a different code per company"
+    steps:
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_b"
+        values:
+          name: "Second Company"
+      - step: "Create account for the default company with an initial code"
+        action: "create"
+        model: "account.account"
+        save_as: "shared_account"
+        values:
+          name: "Shared Account"
+          account_type: "asset_current"
+          code: "500000"
+      - step: "Assert code under the default company"
+        action: "assert"
+        target: "shared_account"
+        asserts:
+          code:
+            type: "value"
+            expected: "500000"
+      - step: "Add the second company and set its own code, viewed as that company"
+        action: "write"
+        target: "shared_account"
+        context:
+          allowed_company_ids: ["REC: company_b.id"]
+        values:
+          company_ids: [[4, "REC: company_b.id"]]
+          code: "600000"
+      - step: "Assert code viewed from the default company is unchanged"
+        action: "assert"
+        target: "shared_account"
+        context:
+          allowed_company_ids: ["REC: company.id"]
+        asserts:
+          code:
+            type: "value"
+            expected: "500000"
+      - step: "Assert code viewed from the second company is the new one"
+        action: "assert"
+        target: "shared_account"
+        context:
+          allowed_company_ids: ["REC: company_b.id"]
+        asserts:
+          code:
+            type: "value"
+            expected: "600000"
+      - step: "Assert both companies are on company_ids"
+        action: "assert"
+        target: "shared_account"
+        asserts:
+          company_ids:
+            type: "m2m"
+            check: "contains"
+            expected_records:
+              - "REC: company"
+              - "REC: company_b"
+
+  - name: "Toggling reconcile from False to True is accepted"
+    steps:
+      - step: "Create a non-cash asset account (reconcile defaults False)"
+        action: "create"
+        model: "account.account"
+        save_as: "acc"
+        values: { name: "Other Asset", account_type: "asset_non_current", code: "130001" }
+      - step: "Assert reconcile starts False"
+        action: "assert"
+        target: "acc"
+        asserts: { reconcile: { type: "value", expected: false } }
+      - step: "Turn reconcile on"
+        action: "write"
+        target: "acc"
+        values: { reconcile: true }
+      - step: "Assert reconcile is now True"
+        action: "assert"
+        target: "acc"
+        asserts: { reconcile: { type: "value", expected: true } }
+      - step: "Turn reconcile back off"
+        action: "write"
+        target: "acc"
+        values: { reconcile: false }
+      - step: "Assert reconcile is False again"
+        action: "assert"
+        target: "acc"
+        asserts: { reconcile: { type: "value", expected: false } }
+
+  - name: "Onchange name splits a leading code into the code field"
+    steps:
+      - step: "Fill the name field with a code-and-name combo"
+        action: "form"
+        model: "account.account"
+        save: false
+        ops:
+          - set: { name: "140001 New Fixed Asset" }
+          - assert:
+              name:
+                type: "value"
+                expected: "New Fixed Asset"
+          - assert:
+              code:
+                type: "value"
+                expected: "140001"
+
+  - name: "Onchange account_type is a safe no-op while tax_ids does not exist yet"
+    steps:
+      - step: "Switch account_type to off_balance, no crash expected"
+        action: "form"
+        model: "account.account"
+        save: false
+        ops:
+          - set: { name: "Off Balance Test" }
+          - set: { code: "920001" }
+          - set: { account_type: "off_balance" }
+          - assert:
+              account_type:
+                type: "value"
+                expected: "off_balance"
+
+  - name: "Duplicate account code in the same company is rejected"
+    steps:
+      - step: "Create first account"
+        action: "create"
+        model: "account.account"
+        save_as: "first"
+        values: { name: "First", account_type: "asset_current", code: "700001" }
+      - step: "Create second account with the same code is rejected"
+        action: "create"
+        model: "account.account"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "Duplicate"
+        values: { name: "Second", account_type: "asset_current", code: "700001" }

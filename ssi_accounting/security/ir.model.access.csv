@@ -5,3 +5,7 @@ access_account_group_all,account.group - all,model_account_group,base.group_user
 access_account_group_manager,account.group - manager,model_account_group,group_accounting_manager,1,1,1,1
 access_account_tag_all,account.tag - all,model_account_tag,base.group_user,1,0,0,0
 access_account_tag_manager,account.tag - manager,model_account_tag,group_accounting_manager,1,1,1,1
+access_account_account_all,account.account - all,model_account_account,base.group_user,1,0,0,0
+access_account_account_manager,account.account - manager,model_account_account,group_accounting_manager,1,1,1,1
+access_account_code_mapping_all,account.code.mapping - all,model_account_code_mapping,base.group_user,1,0,0,0
+access_account_code_mapping_manager,account.code.mapping - manager,model_account_code_mapping,group_accounting_manager,1,1,1,1

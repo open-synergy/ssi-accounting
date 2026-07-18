@@ -10,11 +10,13 @@ Core accounting module for PT. Simetri Sinergi Indonesia (SSI). This module buil
 pure journal entry accounting core, independent of Odoo's native ``account`` module —
 it does not depend on, and will never depend on, the ``account`` addon.
 
-This unit lays down the module skeleton, its own security groups, and the first
+This module lays down the module skeleton, its own security groups, the
 chart-of-accounts support models (``account.root``, ``account.group``,
-``account.tag``) plus phase-1 accounting configuration on ``res.company`` and a
-deactivation guard on ``res.currency``. The ``account`` model itself, and the rest
-of the chart of accounts, are added incrementally by later units.
+``account.tag``), phase-1 accounting configuration on ``res.company``, a
+deactivation guard on ``res.currency``, and the chart of accounts itself:
+``account.account`` (Odoo 19 style multi-company, with a Chart of Accounts menu)
+and its companion ``account.code.mapping``. Journals, taxes, and journal entries
+are added incrementally by later units.
 
 
 Design decisions
@@ -55,10 +57,36 @@ Design decisions
   tag without any report-derived sign semantics — the "+"/"-" prefix shown by
   ``display_name`` for tax tags is a self-contained heuristic (based on whether the
   tag's own name already starts with a sign), not derived from a report expression.
+* ``account.account`` is ported (behaviour-wise) from Odoo core's ``account.account``,
+  keeping its upstream dotted name (not shortened like ``account.tag``) because
+  ``account.group._adapt_accounts_for_account_groups`` already hardcodes
+  ``"account.account"``/``account_account`` — it now becomes active for real
+  (previously a no-op, see below). The Odoo 19 multi-company engine is kept
+  **verbatim, not simplified**: ``company_ids`` (Many2many) backed by ``code_store``
+  (a ``company_dependent`` ``Char``), the computed ``code``/``placeholder_code``
+  fields, and the ``_field_to_sql`` override that turns ``code`` into a per-company
+  JSONB lookup. ``account.code.mapping`` (the "Mapping" tab on the account form) is
+  ported alongside it, unchanged from upstream apart from pointing at this module's
+  own ``account.account``.
+* ``account.account`` does **not** yet have ``tax_ids``: a Many2many field needs a
+  real comodel at registry-build time, so it must wait for the tax configuration
+  unit to add it back via inheritance. ``_onchange_account_type`` (whose only job
+  upstream is clearing ``tax_ids``) and ``related_taxes_amount``/
+  ``action_open_related_taxes`` are kept but guarded on field/model presence, so
+  they start working automatically once the tax unit lands.
+* Several ``account.account`` constraints/computes are guarded no-ops until later
+  units land, exactly like ``account.group``/``res.currency`` above: ``used``,
+  ``current_balance``, the reconcile-toggle guards, and the delete guard on
+  ``account.move.line`` (journal items — lands with ``journal_entry``); the
+  journal/account currency-mismatch check on ``account.journal`` (lands with
+  ``journal``); the delete guard on ``tax.repartition.line`` (lands with the tax
+  units). Dropped entirely (out of this issue's scope): the opening balance
+  triplet, ``non_trade``, the partner-frequency heuristics behind the invoice line
+  account widget, ``name_create``, ``get_import_templates``, and the whole
+  merge/unmerge suite.
 * ``account.group._adapt_accounts_for_account_groups`` (kept from upstream to keep
-  ``account.account.group_id`` in sync with the group hierarchy) is a no-op while
-  ``account.account`` does not exist yet — it starts working automatically once that
-  model is added in a later unit, no further change needed here.
+  ``account.account.group_id`` in sync with the group hierarchy) is no longer a
+  no-op now that ``account.account`` exists.
 * ``res.company`` gains six phase-1 accounting fields: ``account_price_include``,
   ``tax_calculation_rounding_method``, ``fiscalyear_last_day``,
   ``fiscalyear_last_month``, ``fiscalyear_lock_date``, ``tax_lock_date``. Lock dates

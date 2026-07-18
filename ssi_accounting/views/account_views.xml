@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="account_view_search" model="ir.ui.view">
+        <field name="name">account - search</field>
+        <field name="model">account.account</field>
+        <field name="arch" type="xml">
+            <search string="Accounts">
+                <field
+                    name="name"
+                    filter_domain="['|', ('name', 'ilike', self), ('code', '=ilike', self + '%')]"
+                    string="Account"
+                />
+                <filter
+                    name="filter_receivable"
+                    string="Receivable"
+                    domain="[('account_type', '=', 'asset_receivable')]"
+                />
+                <filter
+                    name="filter_payable"
+                    string="Payable"
+                    domain="[('account_type', '=', 'liability_payable')]"
+                />
+                <filter
+                    name="filter_equity"
+                    string="Equity"
+                    domain="[('internal_group', '=', 'equity')]"
+                />
+                <filter
+                    name="filter_assets"
+                    string="Assets"
+                    domain="[('internal_group', '=', 'asset')]"
+                />
+                <filter
+                    name="filter_liability"
+                    string="Liability"
+                    domain="[('internal_group', '=', 'liability')]"
+                />
+                <filter
+                    name="filter_income"
+                    string="Income"
+                    domain="[('internal_group', '=', 'income')]"
+                />
+                <filter
+                    name="filter_expenses"
+                    string="Expenses"
+                    domain="[('internal_group', '=', 'expense')]"
+                />
+                <separator />
+                <filter
+                    name="filter_used"
+                    string="Account with Entries"
+                    domain="[('used', '=', True)]"
+                />
+                <filter
+                    name="filter_inactive"
+                    string="Inactive Accounts"
+                    domain="[('active', '=', False)]"
+                />
+                <field name="account_type" />
+                <!-- Group By -->
+                <group>
+                    <filter
+                        name="group_by_account_type"
+                        string="Account Type"
+                        context="{'group_by': 'account_type'}"
+                    />
+                </group>
+                <searchpanel>
+                    <field name="root_id" icon="fa-filter" limit="false" />
+                    <field name="account_type" icon="fa-filter" limit="false" />
+                </searchpanel>
+            </search>
+        </field>
+    </record>
+
+    <record id="account_view_list" model="ir.ui.view">
+        <field name="name">account - list</field>
+        <field name="model">account.account</field>
+        <field name="arch" type="xml">
+            <list create="1" delete="1" multi_edit="1" string="Chart of Accounts">
+                <field name="placeholder_code" column_invisible="1" />
+                <field name="code" />
+                <field name="name" />
+                <field name="account_type" />
+                <field name="group_id" optional="hide" />
+                <field name="internal_group" column_invisible="1" />
+                <field
+                    name="reconcile"
+                    widget="boolean_toggle"
+                    invisible="account_type in ('asset_cash', 'liability_credit_card', 'off_balance')"
+                />
+                <field name="active" optional="hide" widget="boolean_toggle" />
+                <field name="tag_ids" optional="hide" widget="many2many_tags" />
+                <field
+                    name="currency_id"
+                    options="{'no_create': True}"
+                    groups="base.group_multi_currency"
+                />
+                <field
+                    name="company_ids"
+                    widget="many2many_tags"
+                    readonly="True"
+                    groups="base.group_multi_company"
+                />
+            </list>
+        </field>
+    </record>
+
+    <record id="account_view_form" model="ir.ui.view">
+        <field name="name">account - form</field>
+        <field name="model">account.account</field>
+        <field name="arch" type="xml">
+            <form string="Account">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button
+                            class="oe_stat_button"
+                            name="action_open_related_taxes"
+                            type="object"
+                            icon="fa-bars"
+                            invisible="related_taxes_amount == 0"
+                        >
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="related_taxes_amount" />
+                                </span>
+                                <span class="o_stat_text">Taxes</span>
+                            </div>
+                        </button>
+                    </div>
+                    <group name="main_header">
+                        <field name="name" placeholder="e.g. Current Assets" />
+                        <field name="placeholder_code" invisible="1" />
+                        <field name="code" placeholder="e.g. 101000" />
+                    </group>
+                    <notebook>
+                        <page name="accounting" string="Accounting">
+                            <group>
+                                <group name="accounting_left">
+                                    <field name="account_type" />
+                                    <field
+                                        name="tag_ids"
+                                        widget="many2many_tags"
+                                        domain="[('applicability', '=', 'accounts')]"
+                                        context="{'default_applicability': 'accounts'}"
+                                    />
+                                </group>
+                                <group name="accounting_right">
+                                    <field name="internal_group" invisible="1" readonly="1" />
+                                    <field
+                                        name="currency_id"
+                                        options="{'no_create': True}"
+                                        groups="base.group_multi_currency"
+                                        placeholder="Any currency"
+                                    />
+                                    <field name="active" widget="boolean_toggle" />
+                                    <field name="group_id" groups="base.group_no_one" />
+                                    <field
+                                        name="company_ids"
+                                        widget="many2many_tags"
+                                        options="{'no_create': True}"
+                                        groups="base.group_multi_company"
+                                    />
+                                </group>
+                            </group>
+                        </page>
+                        <page name="notes" string="Notes">
+                            <field name="note" />
+                        </page>
+                        <page
+                            name="mapping"
+                            string="Mapping"
+                            groups="base.group_multi_company"
+                            invisible="not display_mapping_tab"
+                        >
+                            <field name="code_mapping_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="company_id" force_save="1" />
+                                    <field name="code" />
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter />
+            </form>
+        </field>
+    </record>
+
+    <record id="account_action" model="ir.actions.act_window">
+        <field name="name">Chart of Accounts</field>
+        <field name="res_model">account.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="account_view_search" />
+        <field name="view_id" ref="account_view_list" />
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Add a new account</p>
+            <p>
+                An account is part of a ledger allowing your company to
+                register all kinds of debit and credit transactions.
+            </p>
+        </field>
+    </record>
+
+    <menuitem
+        id="account_menu"
+        name="Chart of Accounts"
+        parent="menu_accounting_root"
+        action="account_action"
+        sequence="5"
+    />
+</odoo>
