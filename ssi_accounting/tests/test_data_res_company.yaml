@@ -1,0 +1,35 @@
+scenarios:
+  - name: "Fill accounting configuration fields on the company"
+    steps:
+      - step: "Write the six phase-1 accounting fields"
+        action: "write"
+        target: "company"
+        values:
+          account_price_include: "tax_included"
+          tax_calculation_rounding_method: "round_globally"
+          fiscalyear_last_day: 28
+          fiscalyear_last_month: "2"
+          fiscalyear_lock_date: 2026-01-31
+          tax_lock_date: 2026-01-15
+      - step: "Assert account_price_include"
+        action: "assert"
+        target: "company"
+        asserts:
+          account_price_include:
+            type: "value"
+            expected: "tax_included"
+          tax_calculation_rounding_method:
+            type: "value"
+            expected: "round_globally"
+          fiscalyear_last_day:
+            type: "value"
+            expected: 28
+          fiscalyear_last_month:
+            type: "value"
+            expected: "2"
+          fiscalyear_lock_date:
+            type: "value"
+            expected: 2026-01-31
+          tax_lock_date:
+            type: "value"
+            expected: 2026-01-15

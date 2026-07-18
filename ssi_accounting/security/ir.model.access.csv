@@ -1,2 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_test_mixin_sequence_number_all,test.mixin_sequence_number - All Users,model_test_mixin_sequence_number,base.group_user,1,1,1,1
+access_account_root_all,account.root - all,model_account_root,base.group_user,1,0,0,0
+access_account_group_all,account.group - all,model_account_group,base.group_user,1,0,0,0
+access_account_group_manager,account.group - manager,model_account_group,group_accounting_manager,1,1,1,1
+access_account_tag_all,account.tag - all,model_account_tag,base.group_user,1,0,0,0
+access_account_tag_manager,account.tag - manager,model_account_tag,group_accounting_manager,1,1,1,1

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_company_form_inherit_ssi_accounting" model="ir.ui.view">
+        <field name="name">res.company - accounting - form</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='general_info']" position="after">
+                <page name="ssi_accounting" string="Accounting">
+                    <group name="ssi_accounting_tax_group" string="Taxes">
+                        <field name="account_price_include" />
+                        <field name="tax_calculation_rounding_method" />
+                    </group>
+                    <group name="ssi_accounting_fiscalyear_group" string="Fiscal Year">
+                        <field name="fiscalyear_last_day" />
+                        <field name="fiscalyear_last_month" />
+                    </group>
+                    <group name="ssi_accounting_lock_date_group" string="Lock Dates">
+                        <field name="fiscalyear_lock_date" />
+                        <field name="tax_lock_date" />
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

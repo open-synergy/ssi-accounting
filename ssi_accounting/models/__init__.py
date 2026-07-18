@@ -3,6 +3,11 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 from . import (
+    account_group,
+    account_root,
+    account_tag,
     mixin_sequence_number,
+    res_company,
+    res_currency,
     test_mixin_sequence_number,
 )
