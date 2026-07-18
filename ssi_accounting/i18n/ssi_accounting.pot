@@ -1,0 +1,30 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* ssi_accounting
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: ssi_accounting
+#: model:ir.module.category,name:ssi_accounting.module_category_accounting
+#: model:res.groups.privilege,name:ssi_accounting.res_groups_privilege_accounting
+msgid "Accounting"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:res.groups,name:ssi_accounting.group_accounting_manager
+msgid "Manager"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:res.groups,name:ssi_accounting.group_accounting_user
+msgid "User"
+msgstr ""
