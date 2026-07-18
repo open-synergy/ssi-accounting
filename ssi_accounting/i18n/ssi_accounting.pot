@@ -14,14 +14,123 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/mixin_sequence_number.py:0
+msgid ""
+"\n"
+"Document Type: %(document_type)s\n"
+"Context: Validate document number against its accounting date\n"
+"Database ID: %(database_id)s\n"
+"Problem: %(date_field)s (%(date)s)\n"
+"is not aligned with the existing document number (%(sequence)s)\n"
+"Solution: Clear the document number, or select the affected entries and\n"
+"use the resequence option from the actions menu (developer mode) to\n"
+"realign the numbering with the dates\n"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__name
+msgid "# Document"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/mixin_sequence_number.py:0
+msgid "%s is not a stored field"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.module.category,name:ssi_accounting.module_category_accounting
 #: model:res.groups.privilege,name:ssi_accounting.res_groups_privilege_accounting
 msgid "Accounting"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_mixin_sequence_number
+msgid "Automatic Sequence Number"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__create_uid
+msgid "Created by"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__create_date
+msgid "Created on"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__date
+msgid "Date"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__display_name
+msgid "Display Name"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__id
+msgid "ID"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__write_uid
+msgid "Last Updated by"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__write_date
+msgid "Last Updated on"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:res.groups,name:ssi_accounting.group_accounting_manager
 msgid "Manager"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_mixin_sequence_number__sequence_number
+#: model:ir.model.fields,help:ssi_accounting.field_test_mixin_sequence_number__sequence_number
+msgid ""
+"Running numeric portion of the document number, parsed back out of the "
+"number itself (e.g. 1 for 'TEST/2026/00001')."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__sequence_number
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__sequence_number
+msgid "Sequence Number"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__sequence_prefix
+#: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__sequence_prefix
+msgid "Sequence Prefix"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_mixin_sequence_number__sequence_prefix
+#: model:ir.model.fields,help:ssi_accounting.field_test_mixin_sequence_number__sequence_prefix
+msgid ""
+"Static portion of the document number, ahead of the running sequence digits "
+"(e.g. the 'TEST/2026/' part of 'TEST/2026/00001')."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_test_mixin_sequence_number
+msgid "Test Mixin Sequence Number"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/mixin_sequence_number.py:0
+msgid ""
+"The sequence regex should at least contain the seq grouping keys. For instance:\n"
+"^(?P<prefix1>.*?)(?P<seq>\\d*)(?P<suffix>\\D*?)$"
 msgstr ""
 
 #. module: ssi_accounting
