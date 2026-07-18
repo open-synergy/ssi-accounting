@@ -51,21 +51,24 @@ class AccountCodeMapping(models.Model):
         help="Company this row's code applies to.",
     )
     code = fields.Char(
-        string="Code",
         compute="_compute_code",
         inverse="_inverse_code",
         help="Account code as seen from Company.",
     )
 
+    # No `super().create()` call by design: this model is `_auto = False`
+    # with a synthetic id (`account_id * COMPANY_OFFSET + company_id`), so
+    # there is no real row to insert -- `browse()` on the computed id is the
+    # entire "creation". Mirrors upstream Odoo's own implementation exactly.
     @api.model_create_multi
-    def create(self, vals_list):
+    def create(self, vals_list):  # pylint: disable=method-required-super
         mappings = self.browse(
             [
                 vals["account_id"] * COMPANY_OFFSET + vals["company_id"]
                 for vals in vals_list
             ]
         )
-        for mapping, vals in zip(mappings, vals_list):
+        for mapping, vals in zip(mappings, vals_list, strict=False):
             mapping.code = vals["code"]
         return mappings
 
@@ -91,15 +94,19 @@ class AccountCodeMapping(models.Model):
                     "Accounts."
                 )
             )
-        return self.browse(
-            [
-                account_id * COMPANY_OFFSET + company.id
-                for account_id in account_ids
-                for company in self.env.user.with_context(
-                    active_test=True
-                ).company_ids.sorted(lambda c: (c.sequence, c.name))
-            ]
-        ).filtered_domain(remaining_domain)._as_query()
+        return (
+            self.browse(
+                [
+                    account_id * COMPANY_OFFSET + company.id
+                    for account_id in account_ids
+                    for company in self.env.user.with_context(
+                        active_test=True
+                    ).company_ids.sorted(lambda c: (c.sequence, c.name))
+                ]
+            )
+            .filtered_domain(remaining_domain)
+            ._as_query()
+        )
 
     def _compute_account_id(self):
         for record in self:

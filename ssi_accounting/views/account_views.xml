@@ -146,7 +146,11 @@
                                     />
                                 </group>
                                 <group name="accounting_right">
-                                    <field name="internal_group" invisible="1" readonly="1" />
+                                    <field
+                                        name="internal_group"
+                                        invisible="1"
+                                        readonly="1"
+                                    />
                                     <field
                                         name="currency_id"
                                         options="{'no_create': True}"

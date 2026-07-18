@@ -135,7 +135,6 @@ class AccountAccount(models.Model):
         "company sharing this account can have its own code.",
     )
     code = fields.Char(
-        string="Code",
         size=64,
         tracking=True,
         compute="_compute_code",
@@ -173,7 +172,6 @@ class AccountAccount(models.Model):
             ("expense", "Expense"),
             ("off", "Off Balance"),
         ],
-        string="Internal Group",
         compute="_compute_internal_group",
         search="_search_internal_group",
         help="Broad accounting group derived from account_type.",
@@ -353,9 +351,7 @@ Problem: The following accounts have no company assigned:
 %(accounts)s
 Solution: Assign at least one company to every account
 """,
-                    database_id=",".join(
-                        str(a.id) for a in accounts_without_company
-                    ),
+                    database_id=",".join(str(a.id) for a in accounts_without_company),
                     accounts="\n".join(
                         f"- {a.display_name}" for a in accounts_without_company
                     ),
@@ -379,13 +375,17 @@ Solution: Assign a single company to this account
         if "account.move.line" not in self.env:
             return
         for companies, accounts in self.grouped(lambda a: a.company_ids).items():
-            if self.env["account.move.line"].sudo().search_count(
-                [
-                    ("account_id", "in", accounts.ids),
-                    "!",
-                    ("company_id", "child_of", companies.ids),
-                ],
-                limit=1,
+            if (
+                self.env["account.move.line"]
+                .sudo()
+                .search_count(
+                    [
+                        ("account_id", "in", accounts.ids),
+                        "!",
+                        ("company_id", "child_of", companies.ids),
+                    ],
+                    limit=1,
+                )
             ):
                 raise UserError(
                     self.env._(
@@ -452,7 +452,7 @@ Solution: Align the account currency with its journal's currency
     @api.depends("code_store")
     def _compute_code(self):
         for record, record_root in zip(
-            self, self.with_company(self.env.company.root_id).sudo()
+            self, self.with_company(self.env.company.root_id).sudo(), strict=False
         ):
             record.code = record_root.code_store
 
@@ -470,7 +470,7 @@ Solution: Align the account currency with its journal's currency
 
     def _inverse_code(self):
         for record, record_root in zip(
-            self, self.with_company(self.env.company.root_id).sudo()
+            self, self.with_company(self.env.company.root_id).sudo(), strict=False
         ):
             record_root.code_store = record.code
         self.invalidate_recordset(fnames=["code"], flush=False)
@@ -536,7 +536,9 @@ Solution: Align the account currency with its journal's currency
             for root in roots
         )
 
-    def _search_panel_domain_image(self, field_name, domain, set_count=False, limit=False):
+    def _search_panel_domain_image(
+        self, field_name, domain, set_count=False, limit=False
+    ):
         if field_name != "root_id" or set_count:
             return super()._search_panel_domain_image(
                 field_name, domain, set_count, limit
@@ -567,23 +569,26 @@ Solution: Align the account currency with its journal's currency
             return
         codes = accounts_with_code.mapped("code")
         account_code_values = SQL(",".join(["(%s)"] * len(codes)), *codes)
+        start_len = SQL("char_length(agroup.code_prefix_start)")
+        end_len = SQL("char_length(agroup.code_prefix_end)")
         results = self.env.execute_query(
             SQL(
                 """
-                     SELECT DISTINCT ON (account_code.code)
-                            account_code.code,
-                            agroup.id AS group_id
-                       FROM (VALUES %(account_code_values)s) AS account_code (code)
-                  LEFT JOIN account_group agroup
-                         ON agroup.code_prefix_start
-                            <= LEFT(account_code.code, char_length(agroup.code_prefix_start))
-                        AND agroup.code_prefix_end
-                            >= LEFT(account_code.code, char_length(agroup.code_prefix_end))
-                        AND agroup.company_id = %(root_company_id)s
-                   ORDER BY account_code.code,
-                            char_length(agroup.code_prefix_start) DESC, agroup.id
+                SELECT DISTINCT ON (account_code.code)
+                       account_code.code,
+                       agroup.id AS group_id
+                  FROM (VALUES %(account_code_values)s) AS account_code (code)
+             LEFT JOIN account_group agroup
+                    ON agroup.code_prefix_start
+                       <= LEFT(account_code.code, %(start_len)s)
+                   AND agroup.code_prefix_end
+                       >= LEFT(account_code.code, %(end_len)s)
+                   AND agroup.company_id = %(root_company_id)s
+              ORDER BY account_code.code, %(start_len)s DESC, agroup.id
                 """,
                 account_code_values=account_code_values,
+                start_len=start_len,
+                end_len=end_len,
                 root_company_id=self.env.company.root_id.id,
             )
         )
@@ -722,8 +727,9 @@ Solution: Set the account code manually
     @api.depends("account_type")
     def _compute_internal_group(self):
         for account in self:
-            account.internal_group = account.account_type and account._get_internal_group(
+            account.internal_group = (
                 account.account_type
+                and account._get_internal_group(account.account_type)
             )
 
     def _search_internal_group(self, operator, value):
@@ -784,8 +790,7 @@ Solution: Set the account code manually
         )
         if "code_mapping_ids" in fields_list and "code_mapping_ids" not in defaults:
             defaults["code_mapping_ids"] = [
-                Command.create({"company_id": c.id})
-                for c in self.env.user.company_ids
+                Command.create({"company_id": c.id}) for c in self.env.user.company_ids
             ]
         return defaults
 
@@ -848,9 +853,11 @@ Solution: Set the account code manually
         self.ensure_one()
         if "tax" not in self.env:
             return {"type": "ir.actions.act_window_close"}
-        related_tax_ids = self.env["tax"].search(
-            [("repartition_line_ids.account_id", "=", self.id)]
-        ).ids
+        related_tax_ids = (
+            self.env["tax"]
+            .search([("repartition_line_ids.account_id", "=", self.id)])
+            .ids
+        )
         return {
             "type": "ir.actions.act_window",
             "name": self.env._("Taxes"),
@@ -862,9 +869,15 @@ Solution: Set the account code manually
     @api.model_create_multi
     def create(self, vals_list):
         records_list = []
-        for company_ids, vals_list_for_company in itertools.groupby(
-            vals_list, lambda v: v.get("company_ids", [])
-        ):
+        # `company_ids` raw values are plain lists (Command tuples/ids), which
+        # are not hashable -- `odoo.tools.groupby`'s dict-based grouping would
+        # raise TypeError on them. `itertools.groupby` only compares
+        # consecutive keys with `==`, so it stays correct here; this mirrors
+        # upstream Odoo's own choice for the same reason.
+        for (  # pylint: disable=bad-builtin-groupby
+            company_ids,
+            vals_list_for_company,
+        ) in itertools.groupby(vals_list, lambda v: v.get("company_ids", [])):
             vals_list_for_company = list(vals_list_for_company)
             company_ids = self._fields["company_ids"].convert_to_cache(
                 company_ids, self.browse()
@@ -873,13 +886,16 @@ Solution: Set the account code manually
             if self.env.company in companies or not companies:
                 companies = self.env.company | companies
 
-            new_accounts = super(AccountAccount, self.with_context(
-                allowed_company_ids=companies.ids,
-                defer_account_code_checks=True,
-                default_code_mapping_ids=self.env.context.get(
-                    "default_code_mapping_ids", []
+            new_accounts = super(
+                AccountAccount,
+                self.with_context(
+                    allowed_company_ids=companies.ids,
+                    defer_account_code_checks=True,
+                    default_code_mapping_ids=self.env.context.get(
+                        "default_code_mapping_ids", []
+                    ),
                 ),
-            )).create(vals_list_for_company)
+            ).create(vals_list_for_company)
             records_list.append(new_accounts)
 
         records = self.env["account.account"].union(*records_list)
@@ -915,16 +931,23 @@ Solution: Keep the current currency, or first reassign the existing journal
                         )
                     )
 
-        res = super(AccountAccount, self.with_context(
-            defer_account_code_checks=True,
-            prefetch_fields=not any(f in vals for f in ["code", "account_type"]),
-        )).write(vals)
+        res = super(
+            AccountAccount,
+            self.with_context(
+                defer_account_code_checks=True,
+                prefetch_fields=not any(f in vals for f in ["code", "account_type"]),
+            ),
+        ).write(vals)
 
-        if not self.env.context.get("defer_account_code_checks") and {
-            "company_ids",
-            "code",
-            "code_mapping_ids",
-        } & vals.keys():
+        if (
+            not self.env.context.get("defer_account_code_checks")
+            and {
+                "company_ids",
+                "code",
+                "code_mapping_ids",
+            }
+            & vals.keys()
+        ):
             if "company_ids" in vals:
                 self.invalidate_recordset(fnames=["company_ids"])
             self._ensure_code_is_unique()
@@ -969,17 +992,20 @@ Solution: Set a code for every company this account belongs to
                 duplicate_codes = [
                     code for code, recs in accounts_by_code.items() if len(recs) > 1
                 ]
-            elif duplicates := self.with_company(company).sudo().with_context(
-                active_test=False
-            ).search_fetch(
-                [
-                    ("code", "in", list(accounts_by_code)),
-                    ("id", "not in", self.ids),
-                    "|",
-                    ("company_ids", "parent_of", company.ids),
-                    ("company_ids", "child_of", company.ids),
-                ],
-                ["code_store"],
+            elif (
+                duplicates := self.with_company(company)
+                .sudo()
+                .with_context(active_test=False)
+                .search_fetch(
+                    [
+                        ("code", "in", list(accounts_by_code)),
+                        ("id", "not in", self.ids),
+                        "|",
+                        ("company_ids", "parent_of", company.ids),
+                        ("company_ids", "child_of", company.ids),
+                    ],
+                    ["code_store"],
+                )
             ):
                 duplicate_codes = duplicates.mapped("code")
             if duplicate_codes:
@@ -1062,8 +1088,10 @@ Solution: Fully reconcile or unreconcile those items first
     def _unlink_except_contains_journal_items(self):
         if "account.move.line" not in self.env:
             return
-        if self.env["account.move.line"].sudo().search_count(
-            [("account_id", "in", self.ids)], limit=1
+        if (
+            self.env["account.move.line"]
+            .sudo()
+            .search_count([("account_id", "in", self.ids)], limit=1)
         ):
             raise UserError(
                 self.env._(
