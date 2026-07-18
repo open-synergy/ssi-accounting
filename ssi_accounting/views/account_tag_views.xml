@@ -17,7 +17,8 @@
                     string="Taxes"
                     domain="[('applicability', '=', 'taxes')]"
                 />
-                <group expand="0" string="Group By">
+                <!-- Group By -->
+                <group>
                     <filter
                         name="group_by_applicability"
                         string="Applicability"

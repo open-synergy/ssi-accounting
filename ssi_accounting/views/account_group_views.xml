@@ -13,7 +13,8 @@
                     string="Root Groups"
                     domain="[('parent_id', '=', False)]"
                 />
-                <group expand="0" string="Group By">
+                <!-- Group By -->
+                <group>
                     <filter
                         name="group_by_parent"
                         string="Parent"
