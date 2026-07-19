@@ -62,6 +62,7 @@ class AccountCodeMapping(models.Model):
     # entire "creation". Mirrors upstream Odoo's own implementation exactly.
     @api.model_create_multi
     def create(self, vals_list):  # pylint: disable=method-required-super
+        """Compute each mapping's synthetic id and store its 'code' in cache."""
         mappings = self.browse(
             [
                 vals["account_id"] * COMPANY_OFFSET + vals["company_id"]

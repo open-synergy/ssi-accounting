@@ -215,6 +215,7 @@ Solution: Set the journal code manually
             )
 
     def action_open_journal_entries(self):
+        """Open the list of 'journal_entry' records posted to 'self'."""
         self.ensure_one()
         if "journal_entry" not in self.env:
             return {"type": "ir.actions.act_window_close"}
@@ -331,11 +332,13 @@ Solution: Keep the current company, or first reassign the journal
 
     @api.model_create_multi
     def create(self, vals_list):
+        """Fill in a default company/account before creating each journal."""
         for vals in vals_list:
             self._fill_missing_values(vals)
         return super().create(vals_list)
 
     def write(self, vals):
+        """Write 'vals', rejecting a company change once entries exist."""
         if "company_id" in vals and "journal_entry" in self.env:
             for journal in self:
                 if journal.company_id.id != vals["company_id"] and self.env[
@@ -379,6 +382,7 @@ Solution: Remove or reassign the journal entries before deleting the
             )
 
     def copy_data(self, default=None):
+        """Drop the copied 'code' so a fresh one is computed, and suffix the name."""
         default = dict(default or {})
         vals_list = super().copy_data(default=default)
         for journal, vals in zip(self, vals_list, strict=True):

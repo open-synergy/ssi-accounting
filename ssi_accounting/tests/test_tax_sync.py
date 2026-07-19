@@ -13,18 +13,19 @@ from odoo.tests import tagged
 @tagged("post_install", "-at_install")
 class TestTaxSync(YamlTransactionCase):
     def test_tax_sync(self):
+        """Run the YAML scenarios for the tax synchronisation engine."""
         self.run_yaml_scenario("test_data_tax_sync.yaml")
 
     def test_no_leftover_is_invoice_is_entry_definitions(self):
-        """Python murni -- pemicu P1 (L-01: skenario YAML tidak menyasar
-        record Odoo sama sekali, melainkan isi berkas sumber Python itu
-        sendiri). Kriteria Penerimaan: "Pencarian is_invoice, is_entry,
-        is_sale_document, is_purchase_document pada kedua berkas model
-        tidak menemukan definisi tersisa" -- shim ``is_entry()``/
-        ``is_invoice()`` (dan padanan upstream ``is_sale_document``/
-        ``is_purchase_document``, yang tidak pernah diport sama sekali ke
-        repo ini) wajib sudah dihapus total begitu unit sinkronisasi
-        pajak ini mendarat.
+        """Pure Python -- trigger P1 (L-01: no YAML scenario targets an
+        Odoo record at all here, only the Python source files' own
+        contents). Acceptance criteria: "Searching for is_invoice,
+        is_entry, is_sale_document, is_purchase_document across both
+        model files finds no leftover definition" -- the ``is_entry()``/
+        ``is_invoice()`` shims (and their upstream counterparts
+        ``is_sale_document``/``is_purchase_document``, never ported to
+        this repo at all) must be fully removed once this tax
+        synchronisation unit lands.
         """
         models_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
         checked_files = ("journal_entry.py", "journal_entry_item.py")

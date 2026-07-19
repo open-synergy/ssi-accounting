@@ -10,17 +10,18 @@ from odoo.tests import tagged
 @tagged("post_install", "-at_install")
 class TestReconcile(YamlTransactionCase):
     def test_reconcile(self):
+        """Run the YAML scenarios for journal item reconciliation."""
         self.run_yaml_scenario("test_data_reconcile.yaml")
 
     def test_exchange_difference_amount_is_asserted_with_float_tolerance(self):
-        """Python murni -- pemicu P2 (L-04: `equals` YAML adalah `!=` mentah,
-        tidak ada toleransi float/`places`/`compare_amounts` untuk nilai
-        moneter hasil rekonsiliasi lintas kurs).
+        """Pure Python -- trigger P2 (L-04: YAML's `equals` is a raw `!=`,
+        there is no float tolerance/`places`/`compare_amounts` for the
+        monetary values a cross-currency reconciliation produces).
 
-        CRUD-nya (journal, akun, currency, entry, posting, reconcile) tetap
-        dijalankan seperti skenario YAML pada umumnya -- hanya assertion
-        angka selisih kurs yang butuh toleransi pembulatan ini yang turun ke
-        Python, sesuai Keputusan Desain issue ini.
+        Its CRUD (journal, accounts, currency, entry, posting, reconcile)
+        still runs like any ordinary YAML scenario -- only the exchange
+        difference amount assertion, which needs this rounding tolerance,
+        drops down to Python, per this issue's Keputusan Desain.
         """
         company = self.env.company
         currency = self.env["res.currency"].create(

@@ -1654,9 +1654,9 @@ class JournalEntryItem(models.Model):
         Ported (behaviour-wise) from upstream
         ``AccountMoveLine._check_amls_exigibility_for_reconciliation``,
         with two deliberate departures per this issue's Keputusan Desain
-        ("Rekonsiliasi hanya boleh terjadi pada akun ber-reconcile
-        bernilai True, dalam company yang sama, dan hanya untuk item
-        pada entry ber-state posted"):
+        ("Reconciliation may only happen on an account with reconcile
+        True, within the same company, and only for items on a posted
+        entry"):
 
         - upstream exempts 'asset_cash'/'liability_credit_card' accounts
           from the 'reconcile' check (its only real use is bank-

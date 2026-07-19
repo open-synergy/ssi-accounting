@@ -134,6 +134,7 @@ class TaxRepartitionLine(models.Model):
 
     @api.onchange("repartition_type")
     def onchange_account_id(self):
+        """Clear 'account_id' when 'repartition_type' switches back to 'base'."""
         if self.repartition_type == "base":
             self.account_id = False
 

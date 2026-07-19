@@ -71,3 +71,52 @@ scenarios:
           name: "Group E"
           code_prefix_start: "100"
           code_prefix_end: "19"
+
+  - name: "Deleting an account group re-parents its accounts and child groups"
+    steps:
+      - step: "Create root group covering 7"
+        action: "create"
+        model: "account.group"
+        save_as: "root_group"
+        values:
+          name: "Group Root G7"
+          code_prefix_start: "7"
+      - step: "Create a narrower child group nested under the root group"
+        action: "create"
+        model: "account.group"
+        save_as: "child_group"
+        values:
+          name: "Group Child G70-79"
+          code_prefix_start: "70"
+          code_prefix_end: "79"
+      - step: "Create an account matching the child group's prefix"
+        action: "create"
+        model: "account.account"
+        save_as: "account"
+        values:
+          name: "Account Under Child Group"
+          account_type: "asset_current"
+          code: "705000"
+      - step: "Account is auto-assigned to the (more specific) child group"
+        action: "assert"
+        target: "account"
+        asserts:
+          group_id:
+            type: "m2o"
+            expected: "REC: child_group"
+      - step: "Delete the child group"
+        action: "unlink"
+        target: "child_group"
+      - step: "The account is re-parented to the deleted group's own parent"
+        action: "assert"
+        target: "account"
+        asserts:
+          group_id:
+            type: "m2o"
+            expected: "REC: root_group"
+      - step: "Verify the child group is actually gone"
+        action: "search"
+        model: "account.group"
+        domain: [["name", "=", "Group Child G70-79"]]
+        save_as: "result"
+        expect_count: 0

@@ -10,4 +10,5 @@ from odoo.tests import tagged
 @tagged("post_install", "-at_install")
 class TestTaxGroup(YamlTransactionCase):
     def test_tax_group(self):
+        """Run the YAML scenarios for 'tax_group'."""
         self.run_yaml_scenario("test_data_tax_group.yaml")

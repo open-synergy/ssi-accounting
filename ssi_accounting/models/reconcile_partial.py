@@ -244,6 +244,7 @@ class ReconcilePartial(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        """Create partials, then refresh 'matching_number' on their two lines."""
         partials = super().create(vals_list)
         self._update_matching_number(partials.debit_move_id + partials.credit_move_id)
         return partials

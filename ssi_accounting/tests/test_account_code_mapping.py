@@ -8,25 +8,27 @@ from odoo.tests import TransactionCase, tagged
 
 @tagged("post_install", "-at_install")
 class TestAccountCodeMapping(TransactionCase):
-    """Python murni -- pemicu P1 (L-01: `action: call` membuang nilai balik
-    method; L-02: `target:` di YAML hanya lookup dict pada registry, tidak
-    ada cara meng-assert hasil `search()` langsung tanpa melalui record yang
-    tersimpan di registry).
+    """Pure Python -- trigger P1 (L-01: `action: call` discards a method's
+    return value; L-02: YAML's `target:` is only a registry dict lookup,
+    there is no way to assert a bare `search()` result without first
+    stashing it on a record in the registry).
 
-    ``account.code.mapping`` tidak boleh diakses langsung -- `_search`
-    sengaja menolak domain yang tidak menyaring `account_id`, sehingga satu
-    -satunya cara mengujinya adalah memanggil `search()`/`create()` Python
-    langsung dan meng-assert nilai baliknya, sesuatu yang tidak bisa
-    dilakukan lewat aksi YAML manapun.
+    ``account.code.mapping`` must not be accessed unfiltered -- `_search`
+    deliberately rejects any domain that does not filter on `account_id`,
+    so the only way to test it is to call Python `search()`/`create()`
+    directly and assert their return values, something no YAML action can
+    express.
     """
 
     def test_search_without_account_id_is_rejected(self):
+        """Searching without filtering on 'account_id' must raise 'UserError'."""
         with self.assertRaises(UserError):
             self.env["account.code.mapping"].search(
                 [("company_id", "=", self.env.company.id)]
             )
 
     def test_mapping_reflects_account_code_per_company(self):
+        """A fresh account gets exactly one mapping, holding its own company's code."""
         account = self.env["account.account"].create(
             {
                 "name": "Mapping Test",

@@ -10,4 +10,5 @@ from odoo.tests import tagged
 @tagged("post_install", "-at_install")
 class TestViewSmoke(YamlTransactionCase):
     def test_view_smoke(self):
+        """Load every view of every window action to smoke-test the arch."""
         self.run_yaml_scenario("test_data_view_smoke.yaml")

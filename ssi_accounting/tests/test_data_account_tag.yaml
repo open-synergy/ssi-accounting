@@ -73,3 +73,21 @@ scenarios:
         values:
           name: "Bad Tag"
           applicability: "products"
+
+  - name: "Delete an account tag"
+    steps:
+      - step: "Create a tag"
+        action: "create"
+        model: "account.tag"
+        save_as: "tag_to_delete"
+        values:
+          name: "To Delete"
+      - step: "Delete it"
+        action: "unlink"
+        target: "tag_to_delete"
+      - step: "Verify deleted"
+        action: "search"
+        model: "account.tag"
+        domain: [["name", "=", "To Delete"]]
+        save_as: "result"
+        expect_count: 0

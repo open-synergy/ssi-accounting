@@ -156,3 +156,53 @@ scenarios:
         domain: [["name", "=", "To Delete"]]
         save_as: "result"
         expect_count: 0
+
+  - name: "Deleting a journal that already has journal entries is rejected"
+    steps:
+      - step: "Create the journal under test"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Delete Guard Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Journal Delete Guard A"
+          account_type: "asset_current"
+          code: "900008"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Journal Delete Guard B"
+          account_type: "income"
+          code: "900009"
+      - step: "Create a draft entry on the journal under test"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 20.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 20.0
+      - step: "Deleting the journal is rejected"
+        action: "unlink"
+        target: "journal"
+        expect_error:
+          type: "UserError"
+          message_contains: "journal entries"

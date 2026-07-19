@@ -29,6 +29,7 @@ class ResCurrency(models.Model):
     _inherit = "res.currency"
 
     def write(self, vals):
+        """Write 'vals', rejecting deactivation once the currency is in use."""
         if "active" in vals and not vals["active"]:
             for record in self:
                 if record._has_accounting_entries():
