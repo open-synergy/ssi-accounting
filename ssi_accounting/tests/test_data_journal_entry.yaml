@@ -537,7 +537,7 @@ scenarios:
             type: "value"
             expected: "Updated Ref"
 
-  - name: "A line_section/line_note line can be created without account_id or amounts"
+  - name: "A journal_entry.item rejects a display_type value that no longer exists"
     steps:
       - step: "Create a journal"
         action: "create"
@@ -554,18 +554,11 @@ scenarios:
           name: "Account A"
           account_type: "asset_current"
           code: "JE1201"
-      - step: "Create the credit-side account"
-        action: "create"
-        model: "account.account"
-        save_as: "acc_b"
-        values:
-          name: "Account B"
-          account_type: "income"
-          code: "JE1202"
-      - step: "Create a balanced entry with a section and a note line"
+      - step: "A line with a removed display_type selection value is rejected"
         action: "create"
         model: "journal_entry"
-        save_as: "entry"
+        expect_error:
+          type: "ValueError"
         values:
           journal_id: "REC: journal.id"
           line_ids:
@@ -573,40 +566,4 @@ scenarios:
               - 0
               - display_type: "line_section"
                 name: "Section Header"
-            - - 0
-              - 0
-              - account_id: "REC: acc_a.id"
-                debit: 25.0
-                credit: 0.0
-            - - 0
-              - 0
-              - account_id: "REC: acc_b.id"
-                debit: 0.0
-                credit: 25.0
-            - - 0
-              - 0
-              - display_type: "line_note"
-                name: "A free-form note"
-      - step: "Find the section line"
-        action: "search"
-        model: "journal_entry.item"
-        domain:
-          [["move_id", "=", "REC: entry.id"], ["display_type", "=", "line_section"]]
-        save_as: "section_line"
-        limit: 1
-      - step: "Assert the section line has no account and no amounts"
-        action: "assert"
-        target: "section_line"
-        asserts:
-          account_id:
-            type: "value"
-            operator: "is_falsy"
-          debit:
-            type: "value"
-            expected: 0.0
-          credit:
-            type: "value"
-            expected: 0.0
-          amount_currency:
-            type: "value"
-            expected: 0.0
+                account_id: "REC: acc_a.id"

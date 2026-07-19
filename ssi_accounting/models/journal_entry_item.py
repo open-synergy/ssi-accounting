@@ -12,8 +12,6 @@ _logger = logging.getLogger(__name__)
 DISPLAY_TYPE_SELECTION = [
     ("product", "Item"),
     ("tax", "Tax"),
-    ("line_section", "Section"),
-    ("line_note", "Note"),
 ]
 
 
@@ -46,21 +44,20 @@ class JournalEntryItem(models.Model):
     absent from a base line's source record.
 
     **``display_type`` is kept, required**, but shrunk to
-    ``product``/``tax``/``line_section``/``line_note``: it is the base
-    line vs. tax line discriminator the tax engine
-    (``tax._prepare_base_line_for_taxes_computation``) relies on, so it
-    cannot be dropped even though this issue does not yet wire the tax
-    synchronisation itself (a later, separate unit).
+    ``product``/``tax``: it is the base line vs. tax line discriminator
+    the tax engine (``tax._prepare_base_line_for_taxes_computation``)
+    relies on, so it cannot be dropped even though this issue does not
+    yet wire the tax synchronisation itself (a later, separate unit).
+    Purely cosmetic, non-accounting rows are not a concept this module
+    supports -- every row is accountable.
 
-    **``account_id`` is deliberately not ``required=True``.** Exactly
-    upstream ``account.move.line``'s own mechanism, its necessity is
-    enforced by two ``models.Constraint`` SQL ``CHECK`` constraints
-    ported verbatim (table name aside) below --
-    ``_check_accountable_required_fields``/``_check_non_accountable_fields_null``
-    -- so a ``line_section``/``line_note`` row (purely cosmetic, never
-    posts to an account) is never forced to carry one, while a
-    ``product``/``tax`` row always is. A plain ``required=True`` on the
-    field would wrongly force every row, cosmetic ones included.
+    **``account_id`` is ``required=True``.** Every ``journal_entry.item``
+    row is accountable (``display_type`` is either ``product`` or
+    ``tax``), so there is no row that legitimately carries no account --
+    unlike upstream ``account.move.line``, which must accommodate purely
+    cosmetic, non-accounting rows and therefore enforces the requirement
+    conditionally via SQL ``CHECK`` constraints instead of a plain
+    ``required=True``.
 
     **``balance`` (not ``debit``/``credit``) is the primary, directly
     writable field** the three fill directions all resolve into --
@@ -193,19 +190,17 @@ class JournalEntryItem(models.Model):
         required=True,
         default="product",
         help="Distinguishes a normal debit/credit line ('Item') from a "
-        "tax line ('Tax') or a purely cosmetic section/note line. Read "
-        "by the tax engine to tell base lines from tax lines, and by "
-        "this model's SQL CHECK constraints to tell which rows must "
-        "carry an account and non-zero amounts and which must not.",
+        "tax line ('Tax'). Read by the tax engine to tell base lines "
+        "from tax lines.",
     )
     account_id = fields.Many2one(
         comodel_name="account.account",
+        required=True,
         index=True,
         check_company=True,
-        help="Account this line posts to. Required for 'product'/'tax' "
-        "rows and forbidden for 'line_section'/'line_note' rows -- "
-        "enforced by SQL CHECK, not by 'required=True' here, see the "
-        "class docstring.",
+        help="Account this line posts to. Required for every line: "
+        "every 'journal_entry.item' row is accountable, see the class "
+        "docstring.",
     )
     account_name = fields.Char(
         related="account_id.name",
@@ -487,21 +482,9 @@ class JournalEntryItem(models.Model):
         "reconciled across currencies.",
     )
 
-    _check_accountable_required_fields = models.Constraint(
-        "CHECK(display_type IN ('line_section', 'line_note') "
-        "OR account_id IS NOT NULL)",
-        "Missing required account on accountable line.",
-    )
-    _check_non_accountable_fields_null = models.Constraint(
-        "CHECK(display_type NOT IN ('line_section', 'line_note') "
-        "OR (amount_currency = 0 AND debit = 0 AND credit = 0 "
-        "AND account_id IS NULL))",
-        "Forbidden balance or account on non-accountable line.",
-    )
-
     @api.depends("display_type")
     def _compute_balance(self):
-        """Default 'balance' to itself (i.e. leave it alone) or zero it.
+        """Default 'balance' to itself (i.e. leave it alone).
 
         'balance' has no inverse and is the field the other three fill
         directions ('debit'/'credit', 'amount_currency') resolve back
@@ -514,13 +497,14 @@ class JournalEntryItem(models.Model):
         create()/write() vals, the ORM already marked it "determined"
         before this compute runs, so the assignment below is a no-op;
         for one where it was not, 'line.balance' reads back the type's
-        empty value (0.0), which is the correct default anyway.
+        empty value (0.0), which is the correct default anyway. The
+        '@api.depends("display_type")' trigger is kept (rather than
+        dropped now that no branch reads it) purely so this compute
+        still runs once per line during create()/write(), exactly as
+        before.
         """
         for line in self:
-            if line.display_type in ("line_section", "line_note"):
-                line.balance = 0.0
-            else:
-                line.balance = line.balance or 0.0
+            line.balance = line.balance or 0.0
 
     @api.depends("balance")
     def _compute_debit_credit(self):

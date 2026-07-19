@@ -17,12 +17,13 @@ class TestJournalEntry(YamlTransactionCase):
 
     def test_product_line_without_account_id_raises_integrity_error(self):
         """Pure Python -- trigger P5 (L-22: `expect_error.type` does not
-        cover `psycopg2.IntegrityError`). `account_id` is deliberately not
-        `required=True` at the field level (see the `JournalEntryItem`
-        class docstring) -- its requiredness for `product`/`tax`
-        `display_type` rows is enforced by the SQL `CHECK`
-        `_check_accountable_required_fields`, which fails as a raw
-        `IntegrityError` at the database, not one of the 12 exception
+        cover `psycopg2.IntegrityError`). `account_id` is `required=True`
+        at the field level (see the `JournalEntryItem` class docstring),
+        enforced by the column's `NOT NULL` SQL constraint. A direct
+        Python `create()` call (unlike an RPC call, which the dispatch
+        layer's `retrying()` translates into a `ValidationError`) lets
+        the raw `psycopg2.errors.NotNullViolation` -- a subclass of
+        `IntegrityError` -- propagate as-is, not one of the 12 exception
         types `expect_error` recognises.
         """
         journal = self.env["account.journal"].create(
@@ -47,9 +48,9 @@ class TestJournalEntry(YamlTransactionCase):
 
     def test_tax_line_without_account_id_raises_integrity_error(self):
         """Pure Python -- trigger P5 (L-22), same as the test above but
-        for `display_type` `tax`: `_check_accountable_required_fields`
-        enforces `account_id` for `product`/`tax` alike, not just
-        `product`.
+        for `display_type` `tax`: `account_id`'s `required=True` applies
+        regardless of `display_type`, so it is enforced for `tax` rows
+        exactly like `product` ones.
         """
         journal = self.env["account.journal"].create(
             {"name": "No Account Tax Journal", "type": "general"}
@@ -64,66 +65,6 @@ class TestJournalEntry(YamlTransactionCase):
                     "line_ids": [
                         (0, 0, {"display_type": "tax", "debit": 5.0, "credit": 0.0}),
                         (0, 0, {"account_id": acc_b.id, "debit": 0.0, "credit": 5.0}),
-                    ],
-                }
-            )
-
-    def test_section_line_with_account_id_raises_integrity_error(self):
-        """Pure Python -- trigger P5 (L-22). `_check_non_accountable_fields_null`
-        rejects a `line_section`/`line_note` row that is given an
-        `account_id` -- a SQL `CHECK`, not `@api.constrains`, so it fails
-        as a raw `IntegrityError`, not a `UserError`.
-        """
-        journal = self.env["account.journal"].create(
-            {"name": "Section With Account Journal", "type": "general"}
-        )
-        acc_a = self.env["account.account"].create(
-            {
-                "name": "Section Account A",
-                "account_type": "asset_current",
-                "code": "JESEC001",
-            }
-        )
-        with self.assertRaises(IntegrityError), mute_logger("odoo.sql_db"):
-            self.env["journal_entry"].create(
-                {
-                    "journal_id": journal.id,
-                    "line_ids": [
-                        (
-                            0,
-                            0,
-                            {
-                                "display_type": "line_section",
-                                "name": "Invalid Section",
-                                "account_id": acc_a.id,
-                            },
-                        ),
-                    ],
-                }
-            )
-
-    def test_note_line_with_nonzero_debit_raises_integrity_error(self):
-        """Pure Python -- trigger P5 (L-22). `_check_non_accountable_fields_null`
-        also rejects a `line_note` row whose `debit` is non-zero, even
-        though its `account_id` is empty.
-        """
-        journal = self.env["account.journal"].create(
-            {"name": "Note With Debit Journal", "type": "general"}
-        )
-        with self.assertRaises(IntegrityError), mute_logger("odoo.sql_db"):
-            self.env["journal_entry"].create(
-                {
-                    "journal_id": journal.id,
-                    "line_ids": [
-                        (
-                            0,
-                            0,
-                            {
-                                "display_type": "line_note",
-                                "name": "Invalid Note",
-                                "debit": 5.0,
-                            },
-                        ),
                     ],
                 }
             )
