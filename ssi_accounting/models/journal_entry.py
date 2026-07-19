@@ -386,7 +386,9 @@ class JournalEntry(models.Model):
             return []
 
         moves.flush_recordset(["name"])
-        self.env["journal_entry.item"].flush_model(["debit", "credit", "move_id"])
+        self.env["journal_entry.item"].flush_model(
+            ["debit", "credit", "balance", "move_id"]
+        )
         self.env["journal_entry"].flush_model(["company_id"])
         self.env["res.company"].flush_model(["currency_id"])
         self.env["res.currency"].flush_model(["decimal_places"])

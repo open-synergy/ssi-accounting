@@ -3,14 +3,42 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 from odoo_yaml_test import YamlTransactionCase
+from psycopg2 import IntegrityError
 
 from odoo.tests import tagged
+from odoo.tools import mute_logger
 
 
 @tagged("post_install", "-at_install")
 class TestJournalEntry(YamlTransactionCase):
     def test_journal_entry(self):
         self.run_yaml_scenario("test_data_journal_entry.yaml")
+
+    def test_line_without_account_id_raises_integrity_error(self):
+        """Python murni -- pemicu P5 (L-22: `expect_error.type` tidak
+        mencakup `psycopg2.IntegrityError`; `account_id` wajib diisi
+        lewat `required=True` di level field, bukan `@api.constrains`,
+        dan tanpa `precompute`/default ORM tidak menyisipkan nilai
+        apa pun sebelum INSERT -- kegagalannya adalah NOT NULL
+        constraint mentah di database, bukan salah satu dari 12 tipe
+        exception yang dikenal `expect_error`).
+        """
+        journal = self.env["account.journal"].create(
+            {"name": "No Account Journal", "type": "general"}
+        )
+        acc_b = self.env["account.account"].create(
+            {"name": "No Account B", "account_type": "income", "code": "JENOACC1"}
+        )
+        with self.assertRaises(IntegrityError), mute_logger("odoo.sql_db"):
+            self.env["journal_entry"].create(
+                {
+                    "journal_id": journal.id,
+                    "line_ids": [
+                        (0, 0, {"debit": 10.0, "credit": 0.0}),
+                        (0, 0, {"account_id": acc_b.id, "debit": 0.0, "credit": 10.0}),
+                    ],
+                }
+            )
 
     def test_cumulated_balance_runs_over_lines_in_date_order(self):
         """Python murni -- pemicu P3 (L-06: perbandingan o2m/m2m di YAML

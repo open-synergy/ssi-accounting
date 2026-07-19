@@ -481,41 +481,6 @@ scenarios:
                 debit: 0.0
                 credit: 20.0
 
-  - name: "A line without an account_id is rejected"
-    steps:
-      - step: "Create a journal"
-        action: "create"
-        model: "account.journal"
-        save_as: "journal"
-        values:
-          name: "General Journal"
-          type: "general"
-      - step: "Create the credit-side account"
-        action: "create"
-        model: "account.account"
-        save_as: "acc_b"
-        values:
-          name: "Account B"
-          account_type: "income"
-          code: "JE9002"
-      - step: "Creating an entry with a line lacking account_id is rejected"
-        action: "create"
-        model: "journal_entry"
-        expect_error:
-          type: "ValidationError"
-        values:
-          journal_id: "REC: journal.id"
-          line_ids:
-            - - 0
-              - 0
-              - debit: 10.0
-                credit: 0.0
-            - - 0
-              - 0
-              - account_id: "REC: acc_b.id"
-                debit: 0.0
-                credit: 10.0
-
   - name: "Edit a journal entry's reference"
     steps:
       - step: "Create a journal"
