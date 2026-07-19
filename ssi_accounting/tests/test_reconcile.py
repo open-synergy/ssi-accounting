@@ -24,7 +24,7 @@ class TestReconcile(YamlTransactionCase):
         """
         company = self.env.company
         currency = self.env["res.currency"].create(
-            {"name": "FCUPY", "symbol": "FPY", "rounding": 0.01}
+            {"name": "FCP", "symbol": "FPY", "rounding": 0.01}
         )
         journal = self.env["account.journal"].create(
             {"name": "Reconcile Journal PY", "type": "general"}
@@ -73,8 +73,7 @@ class TestReconcile(YamlTransactionCase):
                             "account_id": acc_ar.id,
                             "currency_id": currency.id,
                             "amount_currency": 1000.0,
-                            "debit": 15000000.0,
-                            "credit": 0.0,
+                            "balance": 15000000.0,
                         },
                     ),
                     (
@@ -102,8 +101,7 @@ class TestReconcile(YamlTransactionCase):
                             "account_id": acc_ar.id,
                             "currency_id": currency.id,
                             "amount_currency": -1000.0,
-                            "debit": 0.0,
-                            "credit": 15500000.0,
+                            "balance": -15500000.0,
                         },
                     ),
                     (

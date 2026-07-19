@@ -1159,7 +1159,7 @@ scenarios:
         model: "res.currency"
         save_as: "fcu"
         values:
-          name: "FCU10"
+          name: "FC9"
           symbol: "F10"
           rounding: 0.01
       - step: "Configure the company's currency exchange settings"
@@ -1182,8 +1182,7 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: 1000.0
-                debit: 15000000.0
-                credit: 0.0
+                balance: 15000000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
@@ -1207,8 +1206,7 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: -1000.0
-                debit: 0.0
-                credit: 15500000.0
+                balance: -15500000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
@@ -1446,7 +1444,7 @@ scenarios:
         model: "res.currency"
         save_as: "fcu"
         values:
-          name: "FCU11"
+          name: "FC1"
           symbol: "F11"
           rounding: 0.01
       - step:
@@ -1472,8 +1470,7 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: 1000.0
-                debit: 15000000.0
-                credit: 0.0
+                balance: 15000000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
@@ -1501,8 +1498,7 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: -1000.0
-                debit: 0.0
-                credit: 15500000.0
+                balance: -15500000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
@@ -1600,7 +1596,7 @@ scenarios:
         model: "res.currency"
         save_as: "fcu"
         values:
-          name: "FCU12"
+          name: "FC2"
           symbol: "F12"
           rounding: 0.01
       - step:
@@ -1626,8 +1622,7 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: 1000.0
-                debit: 15000000.0
-                credit: 0.0
+                balance: 15000000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
@@ -1655,8 +1650,7 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: -1000.0
-                debit: 0.0
-                credit: 15500000.0
+                balance: -15500000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
@@ -1754,7 +1748,7 @@ scenarios:
         model: "res.currency"
         save_as: "fcu"
         values:
-          name: "FCU13"
+          name: "FC3"
           symbol: "F13"
           rounding: 0.01
       - step:
@@ -1780,8 +1774,7 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: 1000.0
-                debit: 15000000.0
-                credit: 0.0
+                balance: 15000000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
@@ -1809,8 +1802,7 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: -1000.0
-                debit: 0.0
-                credit: 15500000.0
+                balance: -15500000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"

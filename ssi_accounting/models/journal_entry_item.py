@@ -2109,11 +2109,20 @@ Solution: Enable "Allow Reconciliation" on the account first
                 company, amount_residual_to_fix
             )
             sequence = len(move_vals["line_ids"])
+            # 'balance' (not 'debit'/'credit') is used here, deliberately
+            # matching '_prepare_reversal_line_vals''s own proven pattern
+            # -- see the class docstring's warning: giving 'debit'/
+            # 'credit' *and* 'amount_currency' together on the same
+            # create() vals lets 'amount_currency''s inverse clobber the
+            # 'balance' 'debit'/'credit''s own inverse just set, silently
+            # zeroing out this line whenever 'amount_currency' is 0
+            # (exactly the "amount_residual" branch above). 'balance' has
+            # no such conflict: it is the primary field the other three
+            # fill directions resolve back into.
             line_vals = [
                 {
                     "name": self.env._("Currency exchange rate difference"),
-                    "debit": -amount_residual if amount_residual < 0.0 else 0.0,
-                    "credit": amount_residual if amount_residual > 0.0 else 0.0,
+                    "balance": -amount_residual,
                     "amount_currency": -amount_residual_currency,
                     "full_reconcile_id": line.full_reconcile_id.id,
                     "account_id": line.account_id.id,
@@ -2123,8 +2132,7 @@ Solution: Enable "Allow Reconciliation" on the account first
                 },
                 {
                     "name": self.env._("Currency exchange rate difference"),
-                    "debit": amount_residual if amount_residual > 0.0 else 0.0,
-                    "credit": -amount_residual if amount_residual < 0.0 else 0.0,
+                    "balance": amount_residual,
                     "amount_currency": amount_residual_currency,
                     "account_id": exchange_line_account.id,
                     "currency_id": line.currency_id.id,
