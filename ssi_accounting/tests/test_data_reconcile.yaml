@@ -141,6 +141,7 @@ scenarios:
         action: "search"
         model: "reconcile_full"
         domain: [["reconciled_line_ids", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "full"
         expect_count: 1
       - step: "Neither line keeps a partial-style 'P' matching number"
         action: "search"
@@ -150,6 +151,7 @@ scenarios:
             ["id", "in", ["REC: line1.id", "REC: line2.id"]],
             ["matching_number", "like", "P%"],
           ]
+        save_as: "no_p_lines"
         expect_count: 0
 
   - name: "Partial reconciliation leaves a residual and a 'P' matching number"
@@ -274,6 +276,7 @@ scenarios:
         action: "search"
         model: "reconcile_full"
         domain: [["reconciled_line_ids", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "no_full"
         expect_count: 0
       - step: "Both lines carry a 'P' matching number"
         action: "search"
@@ -283,6 +286,7 @@ scenarios:
             ["id", "in", ["REC: line1.id", "REC: line2.id"]],
             ["matching_number", "like", "P%"],
           ]
+        save_as: "p_lines"
         expect_count: 2
 
   - name: "Reconciling two debits against one credit leaves the correct residual"
@@ -449,6 +453,7 @@ scenarios:
         action: "search"
         model: "reconcile_partial"
         domain: [["credit_move_id", "=", "REC: line_c1.id"]]
+        save_as: "credit_partials"
         expect_count: 2
 
   - name:
@@ -597,11 +602,13 @@ scenarios:
             ["debit_move_id", "=", "REC: line1.id"],
             ["credit_move_id", "=", "REC: line2.id"],
           ]
+        save_as: "no_partial"
         expect_count: 0
       - step: "No reconcile_full survives"
         action: "search"
         model: "reconcile_full"
         domain: [["reconciled_line_ids", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "no_full_survives"
         expect_count: 0
 
   - name: "Enabling 'Allow Reconciliation' on an account fixes existing items' residual"
@@ -807,8 +814,16 @@ scenarios:
         values:
           name: "Shared Receivable 7"
           account_type: "asset_receivable"
-          code: "REC7AR"
           company_ids: [[6, 0, ["REC: company.id", "REC: company_b.id"]]]
+          code_mapping_ids:
+            - - 0
+              - 0
+              - company_id: "REC: company.id"
+                code: "REC7AR"
+            - - 0
+              - 0
+              - company_id: "REC: company_b.id"
+                code: "REC7AR"
       - step: "Create the contra income account for the default company"
         action: "create"
         model: "account.account"

@@ -10,9 +10,19 @@
         <field name="domain_force">[('company_id', 'in', company_ids)]</field>
     </record>
 
+    <!-- 'perm_create' is deliberately left out (0): 'reconciled_line_ids'
+         is only populated by 'reconcile_full.create()' via a raw SQL
+         UPDATE run *after* 'super().create()' already returned (see that
+         method's docstring), well after the ORM's own create-time
+         access/rule check already ran against an empty
+         'reconciled_line_ids'. A domain keyed on it would therefore
+         reject every 'reconcile_full' ever created, regardless of
+         company. Read/write/unlink happen once the field is populated,
+         so the domain applies correctly to those. -->
     <record id="reconcile_full_multi_company_rule" model="ir.rule">
         <field name="name">Reconcile Full - Multi Company</field>
         <field name="model_id" ref="model_reconcile_full" />
+        <field name="perm_create" eval="0" />
         <field
             name="domain_force"
         >[('reconciled_line_ids.company_id', 'in', company_ids)]</field>
