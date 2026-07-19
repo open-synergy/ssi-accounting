@@ -22,8 +22,9 @@ computation engine), and the journal entry itself: ``journal_entry`` and its
 child ``journal_entry.item``, including its posting/numbering/state machine
 and the synchronisation that turns a taxed line into real tax journal items.
 A posted entry can also be reversed through the ``journal_entry_reversal``
-wizard, producing a mirror entry tied back to the original. Reconciliation
-and exchange-rate differences are added incrementally by later units.
+wizard, producing a mirror entry tied back to the original. Journal item
+reconciliation, including automatic currency exchange difference entries for
+cross-currency matches, is also in place.
 
 
 Design decisions
@@ -310,12 +311,10 @@ Design decisions
   solely for bank-statement reconciliation, out of this unit's scope), only
   within a single company, and only on items whose journal entry is
   ``posted`` (upstream additionally allows a draft entry through). Selisih
-  kurs (currency exchange difference) entry generation is dropped entirely --
-  ``reconcile_partial.exchange_move_id`` is kept as a field but never
-  populated by this unit, the same forward-reference pattern used elsewhere
-  in this module; a later, dedicated currency unit is expected to populate
-  it. Cash-basis tax entries and ``account.reconcile.model`` (automatic bank
-  statement matching) are out of scope entirely.
+  kurs (currency exchange difference) entry generation was deferred to a
+  later, dedicated currency unit at this point -- see below for how it is
+  actually populated. Cash-basis tax entries and ``account.reconcile.model``
+  (automatic bank statement matching) are out of scope entirely.
 * The reconciliation UI for this unit is a **multi-select "Reconcile"/
   "Unreconcile" header button pair on the Journal Items list view**
   (``action_reconcile``/``action_remove_move_reconcile``), plus a
@@ -324,6 +323,28 @@ Design decisions
   reconciliation widget upstream Odoo ships. Matching lines to reconcile is
   entirely manual (select rows on the same, reconciliation-enabled account,
   then click "Reconcile"); there is no suggested-match assistant.
+* Reconciling two journal items recorded in the same foreign currency at
+  different rates now books an automatic currency exchange difference entry,
+  ported (behaviour-wise) from Odoo core's own
+  ``_get_exchange_journal``/``_get_exchange_account``/
+  ``_prepare_exchange_difference_move_vals``/``_create_exchange_difference_moves``.
+  The exchange move always posts to ``res.company.currency_exchange_journal_id``
+  (a ``general``-typed journal); a positive residual books to
+  ``expense_currency_exchange_account_id`` (loss), a negative one to
+  ``income_currency_exchange_account_id`` (gain) -- both configured on the
+  company's "Currency Exchange" settings, added earlier alongside
+  ``account_journal_suspense_account_id``. Missing any of the three raises an
+  SSI-formatted configuration error. The exchange move is posted immediately
+  (both original lines are already posted, per the narrower reconciliation
+  scope above) and reconciled against the residual it fixes right away, so
+  both original items end up with a zero ``amount_residual`` in the company
+  currency. ``reconcile_partial.exchange_move_id``/``journal_entry.
+  exchange_diff_partial_ids`` link a partial to the exchange entry it
+  produced, and ``journal_entry.item.exchange_move_ids`` mirrors it back onto
+  the reconciled lines. Undoing the reconciliation (removing the partial that
+  produced it) reverses the exchange entry through the same
+  ``journal_entry_reversal``-flavoured cascade ``reconcile_partial.unlink()``
+  already uses for a plain reconciliation.
 
 
 Installation

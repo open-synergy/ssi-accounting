@@ -1110,3 +1110,788 @@ scenarios:
           amount_residual:
             type: "value"
             expected: 0.0
+
+  - name:
+      "Cross-currency reconciliation books a posted exchange difference entry, reversed
+      when the reconciliation is undone"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 10"
+          type: "general"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        values:
+          name: "Receivable 10"
+          account_type: "asset_receivable"
+          code: "REC10AR"
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 10"
+          account_type: "income"
+          code: "REC10INC"
+      - step: "Create the exchange gain account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_gain"
+        values:
+          name: "Exchange Gain 10"
+          account_type: "income"
+          code: "REC10GAIN"
+      - step: "Create the exchange loss account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_loss"
+        values:
+          name: "Exchange Loss 10"
+          account_type: "expense"
+          code: "REC10LOSS"
+      - step: "Create a foreign currency"
+        action: "create"
+        model: "res.currency"
+        save_as: "fcu"
+        values:
+          name: "FC9"
+          symbol: "F10"
+          rounding: 0.01
+      - step: "Set FC9's rate to 0.5 as of the receivable entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.5
+          name: 2026-06-01
+      - step: "Set FC9's rate to 0.4 as of the receipt entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.4
+          name: 2026-06-02
+      - step: "Configure the company's currency exchange settings"
+        action: "write"
+        target: "company"
+        values:
+          currency_exchange_journal_id: "REC: journal.id"
+          income_currency_exchange_account_id: "REC: acc_gain.id"
+          expense_currency_exchange_account_id: "REC: acc_loss.id"
+      - step:
+          "Create and post the receivable entry: 1000 FC9 recorded at rate 0.5 (2000.0)"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-06-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: 1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 2000.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step:
+          "Create and post the receipt entry: 1000 FC9 recorded at rate 0.4 (2500.0)"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-06-02
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: -1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 2500.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find the receivable entry's receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry1.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line1"
+        limit: 1
+      - step: "Find the receipt entry's receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry2.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line2"
+        limit: 1
+      - step: "Find both receivable lines as one recordset"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["id", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconcile them"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+      - step: "Assert the receivable-side line closes with zero residual"
+        action: "assert"
+        target: "line1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "Assert the receipt-side line closes with zero residual too"
+        action: "assert"
+        target: "line2"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "Exactly one main reconcile_partial was created between them"
+        action: "search"
+        model: "reconcile_partial"
+        domain:
+          [
+            ["debit_move_id", "=", "REC: line1.id"],
+            ["credit_move_id", "=", "REC: line2.id"],
+          ]
+        save_as: "main_partial"
+        expect_count: 1
+      - step: "Assert the main partial's amount and that it produced an exchange move"
+        action: "assert"
+        target: "main_partial"
+        asserts:
+          amount:
+            type: "value"
+            expected: 2000.0
+          exchange_move_id:
+            type: "value"
+            operator: "is_truthy"
+      - step: "Find the exchange difference entry the main partial produced"
+        action: "search"
+        model: "journal_entry"
+        domain: [["id", "=", "REC: main_partial.exchange_move_id.id"]]
+        save_as: "exchange_move"
+        expect_count: 1
+      - step: "Assert the exchange move is posted, on the configured journal"
+        action: "assert"
+        target: "exchange_move"
+        asserts:
+          state:
+            type: "value"
+            expected: "posted"
+          journal_id:
+            type: "m2o"
+            expected: "REC: journal"
+      - step: "Find the exchange move's line on the gain account"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["move_id", "=", "REC: exchange_move.id"],
+            ["account_id", "=", "REC: acc_gain.id"],
+          ]
+        save_as: "gain_line"
+        expect_count: 1
+      - step: "Assert the 500 gain is credited (received more than recorded)"
+        action: "assert"
+        target: "gain_line"
+        asserts:
+          debit:
+            type: "value"
+            expected: 0.0
+          credit:
+            type: "value"
+            expected: 500.0
+      - step: "Exactly one reconcile_partial points back to the exchange move"
+        action: "search"
+        model: "reconcile_partial"
+        domain: [["exchange_move_id", "=", "REC: exchange_move.id"]]
+        save_as: "diff_partial"
+        expect_count: 1
+      - step:
+          "Assert 'exchange_diff_partial_ids' points to the partial that produced it"
+        action: "assert"
+        target: "diff_partial"
+        asserts:
+          id:
+            type: "value"
+            expected: "REC: main_partial.id"
+      - step: "Undo the reconciliation"
+        action: "call"
+        target: "ar_lines"
+        method: "remove_move_reconcile"
+        as_user: "base.user_admin"
+      - step: "The exchange move was reversed, not left dangling"
+        action: "search"
+        model: "journal_entry"
+        domain: [["reversed_entry_id", "=", "REC: exchange_move.id"]]
+        save_as: "exchange_reversal"
+        expect_count: 1
+      - step: "Both receivable lines' residuals are restored"
+        action: "assert"
+        target: "line1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: false
+          amount_residual:
+            type: "value"
+            expected: 2000.0
+      - step: "Both receivable lines' residuals are restored (credit side)"
+        action: "assert"
+        target: "line2"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: false
+          amount_residual:
+            type: "value"
+            expected: -2500.0
+
+  - name: "Cross-currency reconciliation without an exchange journal is rejected"
+    steps:
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_cfg"
+        values:
+          name: "Exchange Config Company"
+      - step: "Get the admin user"
+        action: "ref"
+        xml_id: "base.user_admin"
+        save_as: "admin_user"
+      - step: "Grant the admin user access to the second company"
+        action: "write"
+        target: "admin_user"
+        values:
+          company_ids: [[4, "REC: company_cfg.id"]]
+      - step: "Create a journal in the second company"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_cfg"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Reconcile Journal 11"
+          type: "general"
+          company_id: "REC: company_cfg.id"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Receivable 11"
+          account_type: "asset_receivable"
+          code: "REC11AR"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Income 11"
+          account_type: "income"
+          code: "REC11INC"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create the exchange gain account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_gain"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Exchange Gain 11"
+          account_type: "income"
+          code: "REC11GAIN"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create the exchange loss account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_loss"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Exchange Loss 11"
+          account_type: "expense"
+          code: "REC11LOSS"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create a foreign currency"
+        action: "create"
+        model: "res.currency"
+        save_as: "fcu"
+        values:
+          name: "FC1"
+          symbol: "F11"
+          rounding: 0.01
+      - step: "Set FC rate to 0.5 as of the receivable entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.5
+          name: 2026-06-03
+      - step: "Set FC rate to 0.4 as of the receipt entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.4
+          name: 2026-06-04
+      - step:
+          "Configure the second company's gain/loss accounts, but not the exchange
+          journal"
+        action: "write"
+        target: "company_cfg"
+        values:
+          income_currency_exchange_account_id: "REC: acc_gain.id"
+          expense_currency_exchange_account_id: "REC: acc_loss.id"
+      - step: "Create and post the receivable entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          journal_id: "REC: journal_cfg.id"
+          date: 2026-06-03
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: 1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 2000.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+      - step: "Create and post the receipt entry, at a different rate"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          journal_id: "REC: journal_cfg.id"
+          date: 2026-06-04
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: -1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 2500.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+      - step: "Find both receivable lines"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["account_id", "=", "REC: acc_ar.id"]]
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconciling them is rejected for the missing exchange journal"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        expect_error:
+          type: "UserError"
+          message_contains: "exchange difference journal is configured"
+
+  - name:
+      "Cross-currency reconciliation without a loss exchange rate account is rejected"
+    steps:
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_cfg"
+        values:
+          name: "Exchange Config Company 2"
+      - step: "Get the admin user"
+        action: "ref"
+        xml_id: "base.user_admin"
+        save_as: "admin_user"
+      - step: "Grant the admin user access to the second company"
+        action: "write"
+        target: "admin_user"
+        values:
+          company_ids: [[4, "REC: company_cfg.id"]]
+      - step: "Create a journal in the second company"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_cfg"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Reconcile Journal 12"
+          type: "general"
+          company_id: "REC: company_cfg.id"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Receivable 12"
+          account_type: "asset_receivable"
+          code: "REC12AR"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Income 12"
+          account_type: "income"
+          code: "REC12INC"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create the exchange gain account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_gain"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Exchange Gain 12"
+          account_type: "income"
+          code: "REC12GAIN"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create a foreign currency"
+        action: "create"
+        model: "res.currency"
+        save_as: "fcu"
+        values:
+          name: "FC2"
+          symbol: "F12"
+          rounding: 0.01
+      - step: "Set FC rate to 0.5 as of the receivable entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.5
+          name: 2026-06-05
+      - step: "Set FC rate to 0.4 as of the receipt entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.4
+          name: 2026-06-06
+      - step:
+          "Configure the second company's journal and gain account, but not the loss
+          account"
+        action: "write"
+        target: "company_cfg"
+        values:
+          currency_exchange_journal_id: "REC: journal_cfg.id"
+          income_currency_exchange_account_id: "REC: acc_gain.id"
+      - step: "Create and post the receivable entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          journal_id: "REC: journal_cfg.id"
+          date: 2026-06-05
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: 1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 2000.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+      - step: "Create and post the receipt entry, at a different rate"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          journal_id: "REC: journal_cfg.id"
+          date: 2026-06-06
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: -1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 2500.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+      - step: "Find both receivable lines"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["account_id", "=", "REC: acc_ar.id"]]
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconciling them is rejected for the missing loss account"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        expect_error:
+          type: "UserError"
+          message_contains: "loss exchange rate account is configured"
+
+  - name:
+      "Cross-currency reconciliation without a gain exchange rate account is rejected"
+    steps:
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_cfg"
+        values:
+          name: "Exchange Config Company 3"
+      - step: "Get the admin user"
+        action: "ref"
+        xml_id: "base.user_admin"
+        save_as: "admin_user"
+      - step: "Grant the admin user access to the second company"
+        action: "write"
+        target: "admin_user"
+        values:
+          company_ids: [[4, "REC: company_cfg.id"]]
+      - step: "Create a journal in the second company"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_cfg"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Reconcile Journal 13"
+          type: "general"
+          company_id: "REC: company_cfg.id"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Receivable 13"
+          account_type: "asset_receivable"
+          code: "REC13AR"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Income 13"
+          account_type: "income"
+          code: "REC13INC"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create the exchange loss account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_loss"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          name: "Exchange Loss 13"
+          account_type: "expense"
+          code: "REC13LOSS"
+          company_ids: [[6, 0, ["REC: company_cfg.id"]]]
+      - step: "Create a foreign currency"
+        action: "create"
+        model: "res.currency"
+        save_as: "fcu"
+        values:
+          name: "FC3"
+          symbol: "F13"
+          rounding: 0.01
+      - step: "Set FC rate to 0.5 as of the receivable entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.5
+          name: 2026-06-07
+      - step: "Set FC rate to 0.4 as of the receipt entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.4
+          name: 2026-06-08
+      - step:
+          "Configure the second company's journal and loss account, but not the gain
+          account"
+        action: "write"
+        target: "company_cfg"
+        values:
+          currency_exchange_journal_id: "REC: journal_cfg.id"
+          expense_currency_exchange_account_id: "REC: acc_loss.id"
+      - step: "Create and post the receivable entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          journal_id: "REC: journal_cfg.id"
+          date: 2026-06-07
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: 1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 2000.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+      - step: "Create and post the receipt entry, at a different rate"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          journal_id: "REC: journal_cfg.id"
+          date: 2026-06-08
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: -1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 2500.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+      - step: "Find both receivable lines"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["account_id", "=", "REC: acc_ar.id"]]
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconciling them is rejected for the missing gain account"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        expect_error:
+          type: "UserError"
+          message_contains: "gain exchange rate account is configured"

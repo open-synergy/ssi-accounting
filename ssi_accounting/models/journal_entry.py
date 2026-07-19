@@ -74,11 +74,17 @@ class JournalEntry(models.Model):
     reads); ``name`` is deliberately **not** cleared by it, and
     ``posted_before`` stays ``True``. ``button_cancel`` writes straight
     to ``cancel`` from either ``draft`` or ``posted`` (tracked
-    automatically via ``state``'s own ``tracking=True``). The
-    exchange-difference posting cascade upstream's ``_post`` triggers
-    on ``to_post`` is out of scope here -- a later multi-currency
-    unit's job -- so ``made_sequence_gap`` is declared but not
-    maintained by any cascade in this unit.
+    automatically via ``state``'s own ``tracking=True``). **The
+    exchange-difference posting cascade upstream's ``_post`` triggers on
+    ``to_post`` now resolves here** -- not inside ``_post()`` itself
+    (upstream's own ``to_post`` gate lives in ``account.move.line``'s
+    ``_create_exchange_difference_moves``, which this repo's currency
+    reconciliation unit ported onto ``journal_entry.item``): every
+    exchange difference entry whose originating lines were already
+    posted gets posted right there, immediately after being created.
+    ``made_sequence_gap`` remains declared but not maintained by any
+    cascade in this unit -- a separate, still out-of-scope concept (see
+    its own field help text).
 
     **``_check_balanced``/``_get_unbalanced_moves`` are ported verbatim**
     (including their raw SQL), with only the table names adapted
@@ -291,6 +297,17 @@ class JournalEntry(models.Model):
         "'state' or a document-type concept (this model has none), per "
         "this issue's Keputusan Desain. See "
         "'_prepare_product_base_line_for_taxes_computation'.",
+    )
+    exchange_diff_partial_ids = fields.One2many(
+        comodel_name="reconcile_partial",
+        inverse_name="exchange_move_id",
+        string="Related Partials",
+        help="Field penghubung: the 'reconcile_partial' row(s) whose "
+        "cross-currency matching generated this entry -- set by "
+        "'journal_entry.item._reconcile_plan_with_sync' once "
+        "'journal_entry.item._create_exchange_difference_moves' "
+        "returns. Empty for a journal entry that is not itself an "
+        "exchange difference entry.",
     )
 
     @api.depends("name")
