@@ -116,6 +116,59 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid ""
+"\n"
+"Context: Reconcile journal items\n"
+"Problem: Account %(account)s does not allow reconciliation\n"
+"Solution: Enable \"Allow Reconciliation\" on the account first\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid ""
+"\n"
+"Context: Reconcile journal items\n"
+"Problem: Some of the selected journal items are already reconciled\n"
+"Solution: Unreconcile them first, or remove them from the selection\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid ""
+"\n"
+"Context: Reconcile journal items\n"
+"Problem: Some of the selected journal items belong to an entry that is\n"
+"    not posted\n"
+"Solution: Post the journal entry first, then reconcile\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid ""
+"\n"
+"Context: Reconcile journal items\n"
+"Problem: The selected journal items are not on the same account:\n"
+"    %(accounts)s\n"
+"Solution: Select journal items on a single account\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid ""
+"\n"
+"Context: Reconcile journal items\n"
+"Problem: The selected journal items don't belong to the same company:\n"
+"    %(companies)s\n"
+"Solution: Select journal items within a single company\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/wizards/journal_entry_reversal.py:0
 msgid ""
 "\n"
@@ -421,6 +474,20 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__matching_number
+msgid ""
+"'P<n>' while only partially reconciled, or the id of the 'reconcile_full' "
+"row once fully reconciled. Written exclusively by "
+"'reconcile_partial._update_matching_number' -- see its own docstring; this "
+"field has no 'compute=' of its own."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_full__partial_reconcile_ids
+msgid "'reconcile_partial' rows collapsed into this full match."
+msgstr ""
+
+#. module: ssi_accounting
 #. odoo-python
 #: code:addons/ssi_accounting/models/journal_entry.py:0
 msgid "- %(move)s: unbalanced by %(delta)s"
@@ -683,6 +750,28 @@ msgid "Allow Reconciliation"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__amount
+msgid ""
+"Always-positive amount matched by this partial, expressed in the company "
+"currency."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__credit_amount_currency
+msgid ""
+"Always-positive amount matched by this partial, expressed in the credit "
+"journal item's own currency."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__debit_amount_currency
+msgid ""
+"Always-positive amount matched by this partial, expressed in the debit "
+"journal item's own currency."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__amount
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__amount
 msgid "Amount"
 msgstr ""
@@ -778,6 +867,13 @@ msgstr ""
 #. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
 msgid "Are you sure you want to cancel this journal entry?"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_list
+msgid ""
+"Are you sure you want to remove the reconciliation of the selected journal "
+"items?"
 msgstr ""
 
 #. module: ssi_accounting
@@ -955,6 +1051,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__company_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__company_id
@@ -970,6 +1067,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__company_currency_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__company_currency_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__company_currency_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__company_currency_id
 msgid "Company Currency"
 msgstr ""
 
@@ -998,6 +1096,13 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry__company_id
 msgid "Company this journal entry belongs to, inherited from its journal."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__company_id
+msgid ""
+"Company this partial reconcile belongs to -- 'debit_move_id''s company (see "
+"the compute's docstring for why not 'credit_move_id''s)."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1061,6 +1166,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_full__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__create_uid
@@ -1077,6 +1184,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_full__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__create_date
@@ -1090,8 +1199,28 @@ msgid "Credit"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__credit_amount_currency
+msgid "Credit Amount Currency"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__liability_credit_card
 msgid "Credit Card"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__credit_currency_id
+msgid "Credit Currency"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__credit_move_id
+msgid "Credit Move"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__matched_credit_ids
+msgid "Credit journal items matched with this (debit) journal item."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1108,6 +1237,13 @@ msgid "Currency"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__company_currency_id
+msgid ""
+"Currency 'amount' is expressed in -- the company currency of this partial "
+"(see 'company_id')."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__currency_id
 msgid ""
 "Currency 'amount_currency' is expressed in. Defaults to the parent journal "
@@ -1115,10 +1251,24 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__credit_currency_id
+msgid ""
+"Currency 'credit_amount_currency' is expressed in -- mirrors "
+"'credit_move_id.currency_id'."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__company_currency_id
 msgid ""
 "Currency 'debit'/'credit'/'balance'/'cumulated_balance' are expressed in -- "
 "the company currency of the parent journal entry."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__debit_currency_id
+msgid ""
+"Currency 'debit_amount_currency' is expressed in -- mirrors "
+"'debit_move_id.currency_id'."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1196,6 +1346,26 @@ msgid "Debit"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__debit_amount_currency
+msgid "Debit Amount Currency"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__debit_currency_id
+msgid "Debit Currency"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__debit_move_id
+msgid "Debit Move"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__matched_debit_ids
+msgid "Debit journal items matched with this (credit) journal item."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__res_company__fiscalyear_last_month__12
 msgid "December"
 msgstr ""
@@ -1261,6 +1431,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_full__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_currency__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__display_name
@@ -1337,6 +1509,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__currency_exchange_journal_id
 msgid "Exchange Difference Journal"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__exchange_move_id
+msgid "Exchange Move"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1494,6 +1671,12 @@ msgid "From Code Prefix"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_reconcile_full
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__full_reconcile_id
+msgid "Full Reconcile"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__income_currency_exchange_account_id
 msgid "Gain Exchange Rate Account"
 msgstr ""
@@ -1567,6 +1750,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_full__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_currency__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__id
@@ -1784,6 +1969,13 @@ msgid "Journal entry this line belongs to."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_full__reconciled_line_ids
+msgid ""
+"Journal items fully matched by this full reconcile -- each has zero residual"
+" left."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry_reversal__journal_id
 msgid ""
 "Journal the reversal entry (and, for 'modify', the new draft copy) is posted"
@@ -1886,6 +2078,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_full__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__write_uid
@@ -1902,6 +2096,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_full__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__write_date
@@ -1961,10 +2157,41 @@ msgid "March"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__matched_credit_ids
+msgid "Matched Credits"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__matched_debit_ids
+msgid "Matched Debits"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_full__reconciled_line_ids
+msgid "Matched Journal Items"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__full_reconcile_id
+msgid "Matching"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__matching_number
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
+msgid "Matching #"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_group__parent_path
 msgid ""
 "Materialized path used to browse the group hierarchy efficiently. Maintained"
 " automatically by the ORM."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__max_date
+msgid "Max Date of Matched Lines"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2281,6 +2508,11 @@ msgid "Parent Path"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_reconcile_partial
+msgid "Partial Reconcile"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__partner_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__partner_id
 msgid "Partner"
@@ -2393,6 +2625,27 @@ msgid "Receivable"
 msgstr ""
 
 #. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_list
+msgid "Reconcile"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__reconciled
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
+msgid "Reconciled"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__reconciled_lines_ids
+msgid "Reconciled Lines"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_full__partial_reconcile_ids
+msgid "Reconciliation Parts"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__ref
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__ref
 msgid "Reference"
@@ -2411,6 +2664,16 @@ msgstr ""
 #. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
 msgid "Reset to Draft"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__amount_residual
+msgid "Residual Amount"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__amount_residual_currency
+msgid "Residual Amount in Currency"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2440,6 +2703,7 @@ msgstr ""
 #. module: ssi_accounting
 #. odoo-python
 #: code:addons/ssi_accounting/models/journal_entry.py:0
+#: code:addons/ssi_accounting/models/reconcile_partial.py:0
 #: code:addons/ssi_accounting/wizards/journal_entry_reversal.py:0
 msgid "Reversal of: %(name)s"
 msgstr ""
@@ -2584,6 +2848,20 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax__active
 msgid "Set active to false to hide the tax without removing it."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__full_reconcile_id
+msgid ""
+"Set once every journal item on this partial's matching number graph has zero"
+" residual left -- see 'journal_entry.item._reconcile_plan_with_sync'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__full_reconcile_id
+msgid ""
+"Set once this line is matched down to zero residual -- see "
+"'reconcile_partial._update_matching_number'."
 msgstr ""
 
 #. module: ssi_accounting
@@ -3019,11 +3297,35 @@ msgid "Technical field: the company's tax rounding method."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__exchange_move_id
+msgid ""
+"Technical field: the currency exchange difference entry generated for this "
+"partial. Never populated by this unit -- see the class docstring -- filled "
+"by a later, dedicated currency unit."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry__highest_name
 msgid ""
 "Technical field: the last sequence number issued so far in this entry's "
 "journal, used to compute 'name_placeholder' and to adjust the accounting "
 "date on posting."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__max_date
+msgid ""
+"Technical field: the later of 'debit_move_id.date'/'credit_move_id.date', "
+"used to determine at which date this reconciliation would show up on an aged"
+" receivable/payable report."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__reconciled_lines_ids
+msgid ""
+"Technical field: the other side of every "
+"'matched_debit_ids'/'matched_credit_ids' pairing on this line, restricted to"
+" lines readable by the current user."
 msgstr ""
 
 #. module: ssi_accounting
@@ -3126,10 +3428,33 @@ msgid "Test Mixin Sequence Number"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__credit_move_id
+msgid "The credit-side journal item matched by this partial reconcile."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__debit_move_id
+msgid "The debit-side journal item matched by this partial reconcile."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry__reversed_entry_id
 msgid ""
 "The journal entry this entry is a mirror reversal of, set by the "
 "'journal_entry_reversal' wizard."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__amount_residual_currency
+msgid "The residual amount on this line, in 'currency_id'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__amount_residual
+msgid ""
+"The residual amount on this line, in the company currency. Zero once fully "
+"reconciled, the original 'balance' while unreconciled, something in-between "
+"while partially reconciled."
 msgstr ""
 
 #. module: ssi_accounting
@@ -3180,6 +3505,16 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__price_unit
 msgid "Unit Price"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_list
+msgid "Unreconcile"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
+msgid "Unreconciled"
 msgstr ""
 
 #. module: ssi_accounting
@@ -3266,6 +3601,13 @@ msgstr ""
 msgid ""
 "Whether this line applies when the tax is used normally ('Base'), or when "
 "the journal entry it was used on is reversed ('Reverse')."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__reconciled
+msgid ""
+"Whether this line's residual is fully matched by "
+"'reconcile_partial'/'reconcile_full' rows."
 msgstr ""
 
 #. module: ssi_accounting
