@@ -134,6 +134,7 @@ class JournalEntry(models.Model):
         store=True,
         readonly=False,
         required=True,
+        precompute=True,
         help="Currency used to encode amounts on this journal entry's lines.",
     )
     line_ids = fields.One2many(
@@ -167,8 +168,7 @@ class JournalEntry(models.Model):
     )
     company_price_include = fields.Selection(
         related="company_id.account_price_include",
-        help="Technical field: the company's default on whether prices "
-        "include taxes.",
+        help="Technical field: the company's default on whether prices include taxes.",
     )
     amount_total_debit = fields.Monetary(
         compute="_compute_amount_total",
@@ -322,15 +322,19 @@ class JournalEntry(models.Model):
             return
         auto_balance_name = self.env._("Automatic Balancing Line")
         suspense_line = self.line_ids.filtered(
-            lambda line: line.name == auto_balance_name
-            and line.account_id == self.journal_id.suspense_account_id
+            lambda line: (
+                line.name == auto_balance_name
+                and line.account_id == self.journal_id.suspense_account_id
+            )
         )
         balance = sum(self.line_ids.mapped("balance")) - sum(
             suspense_line.mapped("balance")
         )
         if self.company_currency_id.is_zero(balance):
             if suspense_line:
-                self.line_ids = [Command.delete(line_id) for line_id in suspense_line.ids]
+                self.line_ids = [
+                    Command.delete(line_id) for line_id in suspense_line.ids
+                ]
             return
         values = {
             "name": auto_balance_name,
@@ -416,7 +420,9 @@ Problem: The following journal entries are not balanced (sum of debit
 Solution: Adjust the lines' debit/credit so each entry balances to zero,
     or set a suspense account on the journal to auto-balance drafts
 """,
-                database_id=",".join(str(move_id) for move_id, _delta in unbalanced_moves),
+                database_id=",".join(
+                    str(move_id) for move_id, _delta in unbalanced_moves
+                ),
                 lines="\n".join(
                     self.env._(
                         "- %(move)s: unbalanced by %(delta)s",

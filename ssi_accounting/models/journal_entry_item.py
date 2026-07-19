@@ -215,6 +215,7 @@ class JournalEntryItem(models.Model):
         store=True,
         readonly=False,
         required=True,
+        precompute=True,
         help="Currency 'amount_currency' is expressed in. Defaults to the "
         "parent journal entry's currency.",
     )
@@ -335,9 +336,7 @@ class JournalEntryItem(models.Model):
     def _compute_currency_id(self):
         for line in self:
             line.currency_id = (
-                line.move_id.currency_id
-                or line.currency_id
-                or line.company_currency_id
+                line.move_id.currency_id or line.currency_id or line.company_currency_id
             )
 
     @api.depends("currency_id", "company_currency_id")

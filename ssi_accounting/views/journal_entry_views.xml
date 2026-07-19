@@ -76,14 +76,23 @@
                     </div>
                     <group>
                         <group name="main_group">
-                            <field name="journal_id" domain="[('id', 'in', suitable_journal_ids)]" />
+                            <field
+                                name="journal_id"
+                                domain="[('id', 'in', suitable_journal_ids)]"
+                            />
                             <field name="date" />
                             <field name="ref" />
                         </group>
                         <group name="secondary_group">
                             <field name="partner_id" />
-                            <field name="currency_id" groups="base.group_multi_currency" />
-                            <field name="company_id" groups="base.group_multi_company" />
+                            <field
+                                name="currency_id"
+                                groups="base.group_multi_currency"
+                            />
+                            <field
+                                name="company_id"
+                                groups="base.group_multi_company"
+                            />
                         </group>
                     </group>
                     <notebook>
@@ -99,12 +108,19 @@
                                     <field name="price_unit" optional="hide" />
                                     <field name="debit" sum="Total Debit" />
                                     <field name="credit" sum="Total Credit" />
-                                    <field name="currency_id" groups="base.group_multi_currency" />
+                                    <field
+                                        name="currency_id"
+                                        groups="base.group_multi_currency"
+                                    />
                                     <field
                                         name="amount_currency"
                                         groups="base.group_multi_currency"
                                     />
-                                    <field name="tax_ids" widget="many2many_tags" optional="hide" />
+                                    <field
+                                        name="tax_ids"
+                                        widget="many2many_tags"
+                                        optional="hide"
+                                    />
                                     <field name="display_type" optional="hide" />
                                 </list>
                             </field>
@@ -206,7 +222,10 @@
                         <group name="amount_group">
                             <field name="debit" />
                             <field name="credit" />
-                            <field name="currency_id" groups="base.group_multi_currency" />
+                            <field
+                                name="currency_id"
+                                groups="base.group_multi_currency"
+                            />
                             <field
                                 name="amount_currency"
                                 groups="base.group_multi_currency"

@@ -87,7 +87,8 @@ scenarios:
       - step: "Find the debit line"
         action: "search"
         model: "journal_entry.item"
-        domain: [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
         save_as: "debit_line"
         limit: 1
       - step: "Assert balance and amount_currency mirror debit"
@@ -124,7 +125,8 @@ scenarios:
       - step: "Find the line filled via balance"
         action: "search"
         model: "journal_entry.item"
-        domain: [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
         save_as: "balance_line"
         limit: 1
       - step: "Assert debit/credit were derived from balance"
@@ -138,7 +140,9 @@ scenarios:
             type: "value"
             expected: 0.0
 
-  - name: "Foreign-currency line fills currency_rate/amount_currency, third fill direction back-computes balance"
+  - name:
+      "Foreign-currency line fills currency_rate/amount_currency, third fill direction
+      back-computes balance"
     steps:
       - step: "Create a foreign currency"
         action: "create"
@@ -155,7 +159,8 @@ scenarios:
           currency_id: "REC: fcu.id"
           rate: 2.0
           name: "EVAL: date.today()"
-      - step: "Create an entry with one foreign-currency line filled via amount_currency"
+      - step:
+          "Create an entry with one foreign-currency line filled via amount_currency"
         action: "create"
         model: "journal_entry"
         save_as: "entry"
@@ -175,7 +180,8 @@ scenarios:
       - step: "Find the foreign-currency line"
         action: "search"
         model: "journal_entry.item"
-        domain: [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
         save_as: "fx_line"
         limit: 1
       - step: "Assert currency_rate is 2.0 and balance was back-computed to 100.0"
@@ -195,7 +201,9 @@ scenarios:
             type: "value"
             expected: false
 
-  - name: "product_id/quantity/price_unit are informational: price_subtotal follows amount_currency"
+  - name:
+      "product_id/quantity/price_unit are informational: price_subtotal follows
+      amount_currency"
     steps:
       - step: "Create an entry with a product-informed line"
         action: "create"
@@ -219,7 +227,8 @@ scenarios:
       - step: "Find the product-informed line"
         action: "search"
         model: "journal_entry.item"
-        domain: [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
         save_as: "product_line"
         limit: 1
       - step: "Assert price_subtotal mirrors amount_currency, not quantity * price_unit"
