@@ -630,7 +630,7 @@ scenarios:
         values:
           name: "Posting Outsider"
           login: "posting_outsider@example.com"
-          group_ids: "REF: base.group_user"
+          group_ids: "RECORDSET: base.group_user"
       - step: "Posting as that user is rejected with an access error"
         action: "call"
         target: "entry"

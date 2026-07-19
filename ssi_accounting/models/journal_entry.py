@@ -465,27 +465,46 @@ class JournalEntry(models.Model):
     @api.depends("posted_before", "state", "journal_id", "date")
     def _compute_name(self):
         # EXTENDS mixin.sequence_number: assign the number only once
-        # posted -- see the class docstring. Every branch below assigns
-        # 'name' explicitly (even when that means self-reading and
-        # re-writing its current value) -- same self-referential no-op
-        # pattern as 'journal_entry.item._compute_balance'. A record
-        # left without an explicit assignment inside this loop is not
-        # safe to rely on keeping its previous value once 'state' (an
-        # '@api.depends' trigger here) is written, e.g. by
-        # 'button_draft' -- it is not preserved.
+        # posted -- see the class docstring.
+        #
+        # 'name' is triggered here by 'state' (an unrelated field, so
+        # this compute reruns on every 'button_draft'/'action_post'
+        # cycle, not just the first time), yet this method itself needs
+        # to know whether 'name' *already* has a value in the database
+        # to decide whether to leave it alone. Reading 'move.name'
+        # (plain ORM access) while 'name' is itself mid-recompute
+        # returns the field's empty value, not what is actually stored
+        # -- Odoo's recursion guard, not a stale-cache problem
+        # 'auto_refresh'-style fixes address. Read the persisted column
+        # directly instead, exactly like this mixin's own
+        # '_get_last_sequence' bypasses the ORM cache for the same
+        # reason (see 'mixin_sequence_number.py'). No flush is needed
+        # first: 'name' is either still NULL from 'create()'s INSERT,
+        # or was last written by '_set_next_sequence()' -> ultimately
+        # '_locked_increment()', which updates it with a direct SQL
+        # UPDATE rather than through the ORM, so the database is
+        # already authoritative for it.
         self = self.sorted(lambda move: (move.date, move._origin.id))
+        stored_names = {}
+        if self.ids:
+            self.env.cr.execute(
+                "SELECT id, name FROM journal_entry WHERE id IN %(ids)s",
+                {"ids": tuple(self.ids)},
+            )
+            stored_names = dict(self.env.cr.fetchall())
         for move in self:
+            stored_name = stored_names.get(move.id)
             if move.state == "cancel":
-                move.name = move.name
+                move.name = stored_name
                 continue
-            move_has_name = move.name and move.name != "/"
+            move_has_name = bool(stored_name) and stored_name != "/"
             if not move.posted_before and not move._sequence_matches_date():
                 move.name = False
                 continue
             if move.date and not move_has_name and move.state != "draft":
                 move._set_next_sequence()
             else:
-                move.name = move.name
+                move.name = stored_name
         self._inverse_name()
 
     def _inverse_name(self):
