@@ -50,7 +50,10 @@ registry.category("web_tour.tours").add("ssi_accounting_journal_entry_create", {
             run: "click",
         },
         {
-            trigger: ".o_form_view.o_form_editable",
+            // 'o_form_editable' sits on the inner '.o_form_renderer' div, NOT on
+            // the '.o_form_view' root -- combining both in one selector matches
+            // nothing (see web/static/src/views/form/form_compiler.js).
+            trigger: ".o_form_editable",
         },
 
         // -- Flow 3 -- Fill in the required fields (Journal, Date)
@@ -141,7 +144,10 @@ registry.category("web_tour.tours").add("ssi_accounting_journal_entry_create", {
             run: "click",
         },
         {
-            trigger: ".o_form_view:not(.o_form_editable)",
+            // Odoo 17+ keeps the form editable after saving, so "not editable" is
+            // never true here. 'o_form_saved' is the real signal: set once the
+            // record is neither new nor dirty.
+            trigger: ".o_form_saved",
         },
 
         // -- Post-Condition -- A new record is created in Draft status
