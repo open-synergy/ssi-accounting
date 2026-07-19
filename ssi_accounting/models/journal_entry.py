@@ -39,13 +39,14 @@ class JournalEntry(models.Model):
     only aggregate fields kept -- for a pure journal entry, total debit and
     total credit are the only aggregates that mean anything.
 
-    **``move_type`` is dropped.** ``is_entry()``/``is_invoice()`` are kept
-    as shims (returning ``True``/``False`` respectively) purely so code
-    ported from upstream elsewhere in this repo (e.g.
-    ``journal_entry.item._compute_currency_rate``) compiles/works
-    unmodified. **These shims must be deleted, along with their now-dead
-    branches, once the tax synchronisation unit lands** -- see the issue's
-    Keputusan Desain.
+    **``move_type`` is dropped, along with ``is_entry()``/``is_invoice()``.**
+    Those two were kept as shims (returning ``True``/``False``
+    respectively) only until the tax synchronisation unit's code ported
+    from upstream (behaviour-gated on them) landed; now that it has (see
+    the "TAXES COMPUTATION" methods below and this issue's Keputusan
+    Desain), every branch that used to depend on them was pruned rather
+    than left dead, and the shims themselves are gone -- neither name
+    resolves on this model any more.
 
     **Posting/numbering/state machine land in this issue.**
     ``journal_entry`` inherits ``mixin.sequence_number``
@@ -746,23 +747,6 @@ Solution: The entry is accounted on %(new_date)s instead
         if unnumbered:
             unnumbered.write(vals)
 
-    def is_entry(self):
-        """Shim: every journal entry in this repo is a plain entry.
-
-        Kept only so code ported (behaviour-wise) from upstream elsewhere
-        in this repo keeps compiling/working unmodified -- see this
-        class's docstring. **Must be removed**, along with its now-dead
-        callers' branches, once the tax synchronisation unit lands.
-        """
-        return True
-
-    def is_invoice(self, include_receipts=False):
-        """Shim: this repo has no invoice documents. Always ``False``.
-
-        See ``is_entry()``'s docstring -- same removal obligation.
-        """
-        return False
-
     @api.model
     def _disable_recursion(self, container, method_name, default=None, target=True):
         """Guard against a method recursively triggering itself.
@@ -802,16 +786,12 @@ Solution: The entry is accounted on %(new_date)s instead
         """Conversion rate used by the tax engine for a 'product' line.
 
         Ported (behaviour-wise) from upstream
-        ``AccountMove._get_product_base_line_currency_rate``. Its
-        ``is_invoice()`` branch (returning ``invoice_currency_rate``) is
-        dead here -- ``is_invoice()`` is permanently ``False`` -- but is
-        kept (guarded, not evaluated) at this "shim still alive" stage;
-        see ``_sync_tax_lines``'s docstring for why *this* particular
-        dead branch is safe to leave in place unlike a couple of others
-        that are not.
+        ``AccountMove._get_product_base_line_currency_rate``, pruned to
+        the entry branch: a plain journal entry has no
+        ``invoice_currency_rate`` to fall back to (see the class
+        docstring), so the rate is always the ratio between
+        ``amount_currency`` and ``balance``.
         """
-        if self.is_invoice(include_receipts=True):
-            return self.invoice_currency_rate
         return (
             abs(product_line.amount_currency / product_line.balance)
             if product_line.balance
@@ -822,32 +802,29 @@ Solution: The entry is accounted on %(new_date)s instead
         """Convert a 'product' journal item into a base line for the tax engine.
 
         Ported (behaviour-wise) from upstream
-        ``AccountMove._prepare_product_base_line_for_taxes_computation``.
-        Its ``is_invoice()`` branch is dead here (see the class docstring
-        and ``_sync_tax_lines``'s), so in practice ``price_unit`` always
-        comes from ``amount_currency`` (not ``price_unit``, which this
-        model keeps purely informational -- see ``journal_entry.item``'s
-        docstring), ``quantity``/``discount`` are hardcoded to
-        ``1.0``/``0.0``, and ``special_mode`` is always
-        ``'total_excluded'``.
+        ``AccountMove._prepare_product_base_line_for_taxes_computation``,
+        pruned to the entry branch (see the class docstring and this
+        issue's Keputusan Desain): ``price_unit`` always comes from
+        ``amount_currency`` (not ``price_unit``, which this model keeps
+        purely informational -- see ``journal_entry.item``'s docstring),
+        ``quantity``/``discount``/``sign`` are hardcoded to
+        ``1.0``/``0.0``/``1``, and ``special_mode`` is always
+        ``'total_excluded'``. **This enforces the product decision that
+        ``quantity``/``price_unit`` stay informational -- do not fork the
+        engine to make them drive the tax base.**
 
         :param product_line: a ``journal_entry.item`` with
             ``display_type == 'product'``.
         :return: a base line, see ``tax._prepare_base_line_for_taxes_computation``.
         """
         self.ensure_one()
-        is_invoice = self.is_invoice(include_receipts=True)
-        sign = self.direction_sign if is_invoice else 1
-
         kwargs = {
-            "price_unit": (
-                product_line.price_unit if is_invoice else product_line.amount_currency
-            ),
-            "quantity": product_line.quantity if is_invoice else 1.0,
-            "discount": product_line.discount if is_invoice else 0.0,
+            "price_unit": product_line.amount_currency,
+            "quantity": 1.0,
+            "discount": 0.0,
             "rate": self._get_product_base_line_currency_rate(product_line),
-            "sign": sign,
-            "special_mode": False if is_invoice else "total_excluded",
+            "sign": 1,
+            "special_mode": "total_excluded",
             "name": product_line.name,
         }
 
@@ -865,33 +842,27 @@ Solution: The entry is accounted on %(new_date)s instead
         """Convert a 'tax' journal item into a tax line for the tax engine.
 
         Ported (behaviour-wise) from upstream
-        ``AccountMove._prepare_tax_line_for_taxes_computation``.
+        ``AccountMove._prepare_tax_line_for_taxes_computation``, pruned to
+        the entry branch: ``sign`` is always ``1`` (no invoice direction
+        concept exists on ``journal_entry`` -- see the class docstring).
 
         :param tax_line: a ``journal_entry.item`` with
             ``tax_repartition_line_id`` set.
         :return: a tax line, see ``tax._prepare_tax_line_for_taxes_computation``.
         """
         self.ensure_one()
-        return self.env["tax"]._prepare_tax_line_for_taxes_computation(
-            tax_line,
-            sign=self.direction_sign if self.is_invoice(include_receipts=True) else 1,
-        )
+        return self.env["tax"]._prepare_tax_line_for_taxes_computation(tax_line, sign=1)
 
     def _get_rounded_base_and_tax_lines(self, round_from_tax_lines=True):
         """Extract the rounded base/tax lines for the taxes computation.
 
         Ported (behaviour-wise) from upstream
-        ``AccountMove._get_rounded_base_and_tax_lines``. Its
-        ``is_invoice()``-gated ``invoice_line_ids``/epd/cash-rounding/
-        non-deductible branches are dead here (no such concepts exist on
-        ``journal_entry`` -- see the class docstring): ``base_amls`` is
-        always ``self.line_ids`` filtered to ``display_type == 'product'``,
-        and the epd/cash-rounding/non-deductible ``filtered()`` calls
-        below always return an empty recordset (those ``display_type``
-        values do not exist in this repo's selection), so the list
-        comprehensions calling their (not-ported-here)
-        ``_prepare_*_base_line_for_taxes_computation`` counterparts never
-        actually execute.
+        ``AccountMove._get_rounded_base_and_tax_lines``, pruned per this
+        issue's Keputusan Desain: a base line is always a ``product``-typed
+        ``journal_entry.item`` (no ``invoice_line_ids``/epd/cash-rounding/
+        non-deductible concepts exist on this model -- see the class
+        docstring) and a tax line is always one carrying
+        ``tax_repartition_line_id``.
 
         :param round_from_tax_lines: whether the manual tax amounts of
             existing tax journal items should be kept, rather than
@@ -902,14 +873,7 @@ Solution: The entry is accounted on %(new_date)s instead
         """
         self.ensure_one()
         AccountTax = self.env["tax"]
-        is_invoice = self.is_invoice(include_receipts=True)
-
-        if self.id or not is_invoice:
-            base_amls = self.line_ids.filtered(
-                lambda line: line.display_type == "product"
-            )
-        else:
-            base_amls = self.env["journal_entry.item"]
+        base_amls = self.line_ids.filtered(lambda line: line.display_type == "product")
         base_lines = [
             self._prepare_product_base_line_for_taxes_computation(line)
             for line in base_amls
@@ -917,41 +881,12 @@ Solution: The entry is accounted on %(new_date)s instead
 
         tax_lines = []
         if self.id:
-            epd_amls = self.line_ids.filtered(lambda line: line.display_type == "epd")
-            base_lines += [
-                self._prepare_epd_base_line_for_taxes_computation(line)
-                for line in epd_amls
-            ]
-            cash_rounding_amls = self.line_ids.filtered(
-                lambda line: line.display_type == "rounding"
-                and not line.tax_repartition_line_id
-            )
-            base_lines += [
-                self._prepare_cash_rounding_base_line_for_taxes_computation(line)
-                for line in cash_rounding_amls
-            ]
-            non_deductible_base_lines = self.line_ids.filtered(
-                lambda line: line.display_type
-                in ("non_deductible_product", "non_deductible_product_total")
-            )
-            base_lines += [
-                self._prepare_non_deductible_base_line_for_taxes_computation(line)
-                for line in non_deductible_base_lines
-            ]
             AccountTax._add_tax_details_in_base_lines(base_lines, self.company_id)
             tax_amls = self.line_ids.filtered("tax_repartition_line_id")
             tax_lines = [
                 self._prepare_tax_line_for_taxes_computation(tax_line)
                 for tax_line in tax_amls
             ]
-            # Upstream also handles 'round_from_tax_lines == "reapply_currency_rate"'
-            # here, reading 'self.invoice_currency_rate' -- a field that was
-            # never created on this model (see '_sync_tax_lines'\'s
-            # docstring: nothing produces that value here, unlike the
-            # is_invoice()-gated branches elsewhere in this method, so
-            # unlike those this one is not kept even as a literal dead
-            # branch -- it would be a live 'AttributeError' waiting for
-            # any future caller that happens to pass that string).
             AccountTax._round_base_lines_tax_details(
                 base_lines,
                 self.company_id,
@@ -970,10 +905,7 @@ Solution: The entry is accounted on %(new_date)s instead
     # internal structure are left to the executor).
 
     def _sync_tax_lines_get_base_lines(self, move):
-        return move.line_ids.filtered(
-            lambda line: line.display_type
-            in ("product", "epd", "rounding", "non_deductible_product")
-        )
+        return move.line_ids.filtered(lambda line: line.display_type == "product")
 
     def _sync_tax_lines_get_tax_lines(self, move):
         return move.line_ids.filtered("tax_repartition_line_id")
@@ -989,12 +921,8 @@ Solution: The entry is accounted on %(new_date)s instead
         AccountTax = self.env["tax"]
         fake_base_line = AccountTax._prepare_base_line_for_taxes_computation(None)
         grouping_key = AccountTax._prepare_base_line_grouping_key(fake_base_line)
-        if line.move_id.is_invoice(include_receipts=True):
-            extra_fields = ["price_unit", "quantity", "discount"]
-        else:
-            extra_fields = ["amount_currency"]
         item_fields = self.env["journal_entry.item"]._fields
-        return [key for key in grouping_key if key in item_fields] + extra_fields
+        return [key for key in grouping_key if key in item_fields] + ["amount_currency"]
 
     def _sync_tax_lines_field_has_changed(self, values, record, field):
         return self._sync_tax_lines_get_value(record, field) != values.get(
@@ -1031,17 +959,9 @@ Solution: The entry is accounted on %(new_date)s instead
     def _sync_tax_lines_snapshot(self, container):
         """Capture the "before" state ``_sync_tax_lines`` diffs against.
 
-        :return: a ``(moves_before, base_lines_before, tax_lines_before)``
-            tuple, each keyed by move.
+        :return: a ``(base_lines_before, tax_lines_before)`` tuple, each
+            keyed by move.
         """
-        moves_before = {
-            move: {
-                field: self._sync_tax_lines_get_value(move, field)
-                for field in ("currency_id", "partner_id")
-            }
-            for move in container["records"]
-            if move.state == "draft"
-        }
         base_lines_before = {
             move: {
                 line: {
@@ -1062,26 +982,26 @@ Solution: The entry is accounted on %(new_date)s instead
             }
             for move in container["records"]
         }
-        return moves_before, base_lines_before, tax_lines_before
+        return base_lines_before, tax_lines_before
 
     def _sync_tax_lines_compute_round_from_tax_lines(
-        self, move, moves_before, base_lines, tax_lines, base_before, tax_before
+        self, base_lines, tax_lines, base_before, tax_before
     ):
-        """Decide how ``_get_rounded_base_and_tax_lines`` should treat ``move``.
+        """Decide how ``_get_rounded_base_and_tax_lines`` should treat this move.
 
-        Upstream's own version can also return ``'reapply_currency_rate'``
-        (a third value for its ``round_from_tax_lines`` parameter) --
-        never reachable here, see ``_sync_tax_lines``'s docstring.
+        Upstream's own version also takes the changing move itself, to
+        decide (via ``is_invoice()``) whether a bare ``currency_id``/
+        ``move_type`` change alone should force
+        ``round_from_tax_lines = False`` -- unreachable here (see
+        ``_sync_tax_lines``'s docstring), so dropped along with the
+        ``move`` parameter. It can also return
+        ``'reapply_currency_rate'`` (a third value for its
+        ``round_from_tax_lines`` parameter) -- likewise unreachable.
 
         :return: ``False``/``True`` (see
             ``_get_rounded_base_and_tax_lines``'s own ``round_from_tax_lines``
-            parameter) to resync ``move``, or ``None`` to skip it entirely.
+            parameter) to resync this move, or ``None`` to skip it entirely.
         """
-        if move.is_invoice(include_receipts=True) and (
-            self._sync_tax_lines_field_has_changed(moves_before, move, "currency_id")
-            or self._sync_tax_lines_field_has_changed(moves_before, move, "move_type")
-        ):
-            return False
         if any(
             line not in base_lines
             for line, values in base_before.items()
@@ -1168,42 +1088,25 @@ Solution: The entry is accounted on %(new_date)s instead
     def _sync_tax_lines(self, container):
         """Create/update/delete tax lines to match their base lines' taxes.
 
-        Ported (behaviour-wise) from Odoo core ``AccountMove._sync_tax_lines``.
-        This is the "mechanical port, shim still alive" half of this
-        issue's two-commit landing (see the issue's Keputusan Desain) --
-        the ``is_invoice()``/``is_entry()``-gated branches, spread across
-        this method and its ``_sync_tax_lines_*`` helpers above (split out
-        only to keep every individual method under this repo's mccabe
-        complexity budget -- a structural deviation from upstream's own
-        single nested-closure-laden method, not a behavioural one), are
-        dead (permanently unreachable, since those shims always resolve
-        the same way here) but are kept structurally intact, and are only
-        pruned in the next commit.
-
-        **Two spots are, deliberately, not kept literal**, because unlike
-        every other dead branch here (which stays inert precisely because
-        Python never evaluates the untaken side of an
-        ``if``/``and``/``or``/ternary), these two are reached
-        *unconditionally* and reference fields upstream has
-        (``move_type``, ``invoice_currency_rate``, ``invoice_date``) but
-        that were never ported onto ``journal_entry`` by *any* unit, this
-        one included -- so keeping them verbatim would not be dead code,
-        it would be an immediate ``KeyError`` on every call:
-        ``_sync_tax_lines_snapshot``'s ``moves_before`` only tracks
-        ``currency_id``/``partner_id`` (upstream also tracks the three
-        fields above), and the ``elif`` branch that would set
-        ``round_from_tax_lines = 'reapply_currency_rate'`` when
-        ``invoice_currency_rate`` changes is omitted from
-        ``_sync_tax_lines_compute_round_from_tax_lines`` (falling straight
-        through to "skip this move" instead).
+        Ported (behaviour-wise) from Odoo core ``AccountMove._sync_tax_lines``,
+        pruned per this issue's Keputusan Desain: only entries whose lines
+        carry ``tax_ids``/``tax_repartition_line_id`` reach this stage at
+        all (see ``_sync_dynamic_lines``), a base line is always
+        ``display_type == 'product'``, and every ``is_invoice()``-gated
+        branch upstream had (a bare ``currency_id``/``move_type`` change
+        forcing a full recompute, ``price_unit``/``quantity``/``discount``
+        as extra tracked fields, ``'reapply_currency_rate'``) is gone --
+        this model has no invoice/move_type concept at all (see the class
+        docstring). Split into the ``_sync_tax_lines_*`` helper methods
+        above purely to keep every individual method under this repo's
+        mccabe complexity budget -- a structural deviation from upstream's
+        own single nested-closure-laden method, not a behavioural one.
 
         :param container: dict with a ``'records'`` key, holding only the
             entries whose lines carry ``tax_ids``/``tax_repartition_line_id``
             (see ``_sync_dynamic_lines``).
         """
-        moves_before, base_lines_before, tax_lines_before = (
-            self._sync_tax_lines_snapshot(container)
-        )
+        base_lines_before, tax_lines_before = self._sync_tax_lines_snapshot(container)
         yield
 
         to_delete = []
@@ -1216,8 +1119,6 @@ Solution: The entry is accounted on %(new_date)s instead
             tax_lines = self._sync_tax_lines_get_tax_lines(move)
             base_lines = self._sync_tax_lines_get_base_lines(move)
             round_from_tax_lines = self._sync_tax_lines_compute_round_from_tax_lines(
-                move,
-                moves_before,
                 base_lines,
                 tax_lines,
                 base_lines_before.get(move, {}),
