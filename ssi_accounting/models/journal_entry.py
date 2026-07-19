@@ -3,14 +3,15 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 import calendar
-from contextlib import contextmanager
+from collections import defaultdict
+from contextlib import ExitStack, contextmanager
 from datetime import date, timedelta
 
 from dateutil.relativedelta import relativedelta
 
 from odoo import Command, api, fields, models
 from odoo.exceptions import AccessError, UserError
-from odoo.tools import date_utils
+from odoo.tools import date_utils, frozendict
 
 
 class JournalEntry(models.Model):
@@ -84,13 +85,16 @@ class JournalEntry(models.Model):
     ``journal_entry_item``) -- see their own docstrings for why they read
     the database directly instead of going through the ORM cache.
 
-    **``_sync_dynamic_lines`` is ported as a context-manager scaffold**,
-    its stack trimmed to a single stage, ``_sync_unbalanced_lines``
-    (upstream additionally resyncs rounding/cash-rounding/payment-term/tax
-    lines here -- all out of this issue's scope). ``_disable_recursion`` is
-    kept from upstream to break the recursive ``write()`` call
-    ``_sync_unbalanced_lines`` makes when it adjusts the auto-balancing
-    line.
+    **``_sync_dynamic_lines`` is ported as an ``ExitStack`` scaffold**,
+    trimmed to two stages -- ``_sync_balancing_lines`` (formerly the whole
+    of this method, before the tax synchronisation unit added a second
+    stage) and ``_sync_tax_lines`` -- upstream additionally resyncs
+    rounding/cash-rounding/payment-term lines and invoice-only concerns
+    here, all out of this issue's scope; see ``_sync_dynamic_lines``'s own
+    docstring for why the two stages are entered in that specific order.
+    ``_disable_recursion`` is kept from upstream to break the recursive
+    ``write()`` call ``_sync_balancing_lines`` makes when it adjusts the
+    auto-balancing line.
     """
 
     _name = "journal_entry"
@@ -785,15 +789,465 @@ Solution: The entry is accounted on %(new_date)s instead
         container["records"] = flagged
         return False
 
+    # ======================================================================
+    # TAXES COMPUTATION: BASE/TAX LINE ADAPTERS
+    # ======================================================================
+    # Ported (behaviour-wise) from Odoo core ``account_move.py``. These sit
+    # on the header (not on ``journal_entry.item``), exactly like upstream's
+    # own placement on ``AccountMove`` -- they convert a *line* into the
+    # dict shape ``tax``'s computation engine (``models/tax.py``, added by
+    # a prior unit) understands.
+
+    def _get_product_base_line_currency_rate(self, product_line):
+        """Conversion rate used by the tax engine for a 'product' line.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMove._get_product_base_line_currency_rate``. Its
+        ``is_invoice()`` branch (returning ``invoice_currency_rate``) is
+        dead here -- ``is_invoice()`` is permanently ``False`` -- but is
+        kept (guarded, not evaluated) at this "shim still alive" stage;
+        see ``_sync_tax_lines``'s docstring for why *this* particular
+        dead branch is safe to leave in place unlike a couple of others
+        that are not.
+        """
+        if self.is_invoice(include_receipts=True):
+            return self.invoice_currency_rate
+        return (
+            abs(product_line.amount_currency / product_line.balance)
+            if product_line.balance
+            else 0.0
+        )
+
+    def _prepare_product_base_line_for_taxes_computation(self, product_line):
+        """Convert a 'product' journal item into a base line for the tax engine.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMove._prepare_product_base_line_for_taxes_computation``.
+        Its ``is_invoice()`` branch is dead here (see the class docstring
+        and ``_sync_tax_lines``'s), so in practice ``price_unit`` always
+        comes from ``amount_currency`` (not ``price_unit``, which this
+        model keeps purely informational -- see ``journal_entry.item``'s
+        docstring), ``quantity``/``discount`` are hardcoded to
+        ``1.0``/``0.0``, and ``special_mode`` is always
+        ``'total_excluded'``.
+
+        :param product_line: a ``journal_entry.item`` with
+            ``display_type == 'product'``.
+        :return: a base line, see ``tax._prepare_base_line_for_taxes_computation``.
+        """
+        self.ensure_one()
+        is_invoice = self.is_invoice(include_receipts=True)
+        sign = self.direction_sign if is_invoice else 1
+
+        kwargs = {
+            "price_unit": (
+                product_line.price_unit if is_invoice else product_line.amount_currency
+            ),
+            "quantity": product_line.quantity if is_invoice else 1.0,
+            "discount": product_line.discount if is_invoice else 0.0,
+            "rate": self._get_product_base_line_currency_rate(product_line),
+            "sign": sign,
+            "special_mode": False if is_invoice else "total_excluded",
+            "name": product_line.name,
+        }
+
+        computation_key = (product_line.extra_tax_data or {}).get("computation_key", "")
+        if computation_key.startswith("global_discount"):
+            kwargs["special_type"] = "global_discount"
+        elif computation_key.startswith("down_payment"):
+            kwargs["special_type"] = "down_payment"
+
+        return self.env["tax"]._prepare_base_line_for_taxes_computation(
+            product_line, **kwargs
+        )
+
+    def _prepare_tax_line_for_taxes_computation(self, tax_line):
+        """Convert a 'tax' journal item into a tax line for the tax engine.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMove._prepare_tax_line_for_taxes_computation``.
+
+        :param tax_line: a ``journal_entry.item`` with
+            ``tax_repartition_line_id`` set.
+        :return: a tax line, see ``tax._prepare_tax_line_for_taxes_computation``.
+        """
+        self.ensure_one()
+        return self.env["tax"]._prepare_tax_line_for_taxes_computation(
+            tax_line,
+            sign=self.direction_sign if self.is_invoice(include_receipts=True) else 1,
+        )
+
+    def _get_rounded_base_and_tax_lines(self, round_from_tax_lines=True):
+        """Extract the rounded base/tax lines for the taxes computation.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMove._get_rounded_base_and_tax_lines``. Its
+        ``is_invoice()``-gated ``invoice_line_ids``/epd/cash-rounding/
+        non-deductible branches are dead here (no such concepts exist on
+        ``journal_entry`` -- see the class docstring): ``base_amls`` is
+        always ``self.line_ids`` filtered to ``display_type == 'product'``,
+        and the epd/cash-rounding/non-deductible ``filtered()`` calls
+        below always return an empty recordset (those ``display_type``
+        values do not exist in this repo's selection), so the list
+        comprehensions calling their (not-ported-here)
+        ``_prepare_*_base_line_for_taxes_computation`` counterparts never
+        actually execute.
+
+        :param round_from_tax_lines: whether the manual tax amounts of
+            existing tax journal items should be kept, rather than
+            recomputed from scratch. Only matters once the entry is
+            stored (``self.id``).
+        :return: a tuple ``<base_lines, tax_lines>`` for the taxes
+            computation.
+        """
+        self.ensure_one()
+        AccountTax = self.env["tax"]
+        is_invoice = self.is_invoice(include_receipts=True)
+
+        if self.id or not is_invoice:
+            base_amls = self.line_ids.filtered(
+                lambda line: line.display_type == "product"
+            )
+        else:
+            base_amls = self.env["journal_entry.item"]
+        base_lines = [
+            self._prepare_product_base_line_for_taxes_computation(line)
+            for line in base_amls
+        ]
+
+        tax_lines = []
+        if self.id:
+            epd_amls = self.line_ids.filtered(lambda line: line.display_type == "epd")
+            base_lines += [
+                self._prepare_epd_base_line_for_taxes_computation(line)
+                for line in epd_amls
+            ]
+            cash_rounding_amls = self.line_ids.filtered(
+                lambda line: line.display_type == "rounding"
+                and not line.tax_repartition_line_id
+            )
+            base_lines += [
+                self._prepare_cash_rounding_base_line_for_taxes_computation(line)
+                for line in cash_rounding_amls
+            ]
+            non_deductible_base_lines = self.line_ids.filtered(
+                lambda line: line.display_type
+                in ("non_deductible_product", "non_deductible_product_total")
+            )
+            base_lines += [
+                self._prepare_non_deductible_base_line_for_taxes_computation(line)
+                for line in non_deductible_base_lines
+            ]
+            AccountTax._add_tax_details_in_base_lines(base_lines, self.company_id)
+            tax_amls = self.line_ids.filtered("tax_repartition_line_id")
+            tax_lines = [
+                self._prepare_tax_line_for_taxes_computation(tax_line)
+                for tax_line in tax_amls
+            ]
+            # Upstream also handles 'round_from_tax_lines == "reapply_currency_rate"'
+            # here, reading 'self.invoice_currency_rate' -- a field that was
+            # never created on this model (see '_sync_tax_lines'\'s
+            # docstring: nothing produces that value here, unlike the
+            # is_invoice()-gated branches elsewhere in this method, so
+            # unlike those this one is not kept even as a literal dead
+            # branch -- it would be a live 'AttributeError' waiting for
+            # any future caller that happens to pass that string).
+            AccountTax._round_base_lines_tax_details(
+                base_lines,
+                self.company_id,
+                tax_lines=tax_lines if round_from_tax_lines else [],
+            )
+        else:
+            AccountTax._add_tax_details_in_base_lines(base_lines, self.company_id)
+            AccountTax._round_base_lines_tax_details(base_lines, self.company_id)
+        return base_lines, tax_lines
+
+    # -- '_sync_tax_lines' helpers -----------------------------------------
+    # Split out of the contextmanager itself (upstream inlines all of these
+    # as nested closures) purely to keep '_sync_tax_lines' under this
+    # repo's mccabe complexity budget -- a structural, not behavioural,
+    # deviation from a literal port (see 'item-format.md' §0/§6: path and
+    # internal structure are left to the executor).
+
+    def _sync_tax_lines_get_base_lines(self, move):
+        return move.line_ids.filtered(
+            lambda line: line.display_type
+            in ("product", "epd", "rounding", "non_deductible_product")
+        )
+
+    def _sync_tax_lines_get_tax_lines(self, move):
+        return move.line_ids.filtered("tax_repartition_line_id")
+
+    @api.model
+    def _sync_tax_lines_get_value(self, record, field):
+        return record._fields[field].convert_to_write(record[field], record)
+
+    def _sync_tax_lines_get_tax_line_tracked_fields(self, line):
+        return ("amount_currency", "balance")
+
+    def _sync_tax_lines_get_base_line_tracked_fields(self, line):
+        AccountTax = self.env["tax"]
+        fake_base_line = AccountTax._prepare_base_line_for_taxes_computation(None)
+        grouping_key = AccountTax._prepare_base_line_grouping_key(fake_base_line)
+        if line.move_id.is_invoice(include_receipts=True):
+            extra_fields = ["price_unit", "quantity", "discount"]
+        else:
+            extra_fields = ["amount_currency"]
+        item_fields = self.env["journal_entry.item"]._fields
+        return [key for key in grouping_key if key in item_fields] + extra_fields
+
+    def _sync_tax_lines_field_has_changed(self, values, record, field):
+        return self._sync_tax_lines_get_value(record, field) != values.get(
+            record, {}
+        ).get(field)
+
+    def _sync_tax_lines_get_changed_lines(self, values, records, fields=None):
+        return (
+            record
+            for record in records
+            if record not in values
+            or any(
+                self._sync_tax_lines_field_has_changed(values, record, field)
+                for field in values[record]
+                if not fields or field in fields
+            )
+        )
+
+    def _sync_tax_lines_any_field_has_changed(self, values, records, fields=None):
+        return any(
+            record
+            for record in self._sync_tax_lines_get_changed_lines(
+                values, records, fields
+            )
+        )
+
+    def _sync_tax_lines_is_write_needed(self, line, values):
+        item_fields = self.env["journal_entry.item"]._fields
+        return any(
+            item_fields[fname].convert_to_write(line[fname], self) != values[fname]
+            for fname in values
+        )
+
+    def _sync_tax_lines_snapshot(self, container):
+        """Capture the "before" state ``_sync_tax_lines`` diffs against.
+
+        :return: a ``(moves_before, base_lines_before, tax_lines_before)``
+            tuple, each keyed by move.
+        """
+        moves_before = {
+            move: {
+                field: self._sync_tax_lines_get_value(move, field)
+                for field in ("currency_id", "partner_id")
+            }
+            for move in container["records"]
+            if move.state == "draft"
+        }
+        base_lines_before = {
+            move: {
+                line: {
+                    field: self._sync_tax_lines_get_value(line, field)
+                    for field in self._sync_tax_lines_get_base_line_tracked_fields(line)
+                }
+                for line in self._sync_tax_lines_get_base_lines(move)
+            }
+            for move in container["records"]
+        }
+        tax_lines_before = {
+            move: {
+                line: {
+                    field: self._sync_tax_lines_get_value(line, field)
+                    for field in self._sync_tax_lines_get_tax_line_tracked_fields(line)
+                }
+                for line in self._sync_tax_lines_get_tax_lines(move)
+            }
+            for move in container["records"]
+        }
+        return moves_before, base_lines_before, tax_lines_before
+
+    def _sync_tax_lines_compute_round_from_tax_lines(
+        self, move, moves_before, base_lines, tax_lines, base_before, tax_before
+    ):
+        """Decide how ``_get_rounded_base_and_tax_lines`` should treat ``move``.
+
+        Upstream's own version can also return ``'reapply_currency_rate'``
+        (a third value for its ``round_from_tax_lines`` parameter) --
+        never reachable here, see ``_sync_tax_lines``'s docstring.
+
+        :return: ``False``/``True`` (see
+            ``_get_rounded_base_and_tax_lines``'s own ``round_from_tax_lines``
+            parameter) to resync ``move``, or ``None`` to skip it entirely.
+        """
+        if move.is_invoice(include_receipts=True) and (
+            self._sync_tax_lines_field_has_changed(moves_before, move, "currency_id")
+            or self._sync_tax_lines_field_has_changed(moves_before, move, "move_type")
+        ):
+            return False
+        if any(
+            line not in base_lines
+            for line, values in base_before.items()
+            if values["tax_ids"]
+        ):
+            return self._sync_tax_lines_any_field_has_changed(tax_before, tax_lines)
+        changed_lines = list(
+            self._sync_tax_lines_get_changed_lines(base_before, base_lines)
+        )
+        if not changed_lines:
+            return None
+        round_from_tax_lines = all(
+            not line.tax_ids and not base_before.get(line, {}).get("tax_ids")
+            for line in changed_lines
+        ) or (
+            list(tax_before) != list(tax_lines)
+            or any(
+                self.env.is_protected(line._fields[fname], line)
+                for line in tax_lines
+                for fname in tax_before[line]
+            )
+        )
+        if round_from_tax_lines and any(
+            line[field]
+            for line in changed_lines
+            for field in ("amount_currency", "balance")
+        ):
+            return None
+        return round_from_tax_lines
+
+    def _sync_tax_lines_collect(
+        self, move, round_from_tax_lines, to_delete, to_create, grouped_update
+    ):
+        """Compute ``move``'s tax line diff, accumulated into the caller's lists."""
+        AccountTax = self.env["tax"]
+        item_fields = self.env["journal_entry.item"]._fields
+        base_lines_values, tax_lines_values = move._get_rounded_base_and_tax_lines(
+            round_from_tax_lines=round_from_tax_lines
+        )
+        AccountTax._add_accounting_data_in_base_lines_tax_details(
+            # Upstream passes 'move.always_tax_exigible' here -- that field
+            # was never created (cash basis is out of scope, see the
+            # issue's Keputusan Desain), so unlike every other
+            # is_invoice()-dead branch in this method, there is no branch
+            # to keep alive: hardcoded 'True' is already this issue's
+            # final value, nothing left to prune later.
+            base_lines_values,
+            move.company_id,
+            include_caba_tags=True,
+        )
+        tax_results = AccountTax._prepare_tax_lines(
+            base_lines_values, move.company_id, tax_lines=tax_lines_values
+        )
+
+        for base_line, to_update in tax_results["base_lines_to_update"]:
+            line = base_line["record"]
+            if self._sync_tax_lines_is_write_needed(line, to_update):
+                grouped_update[line.currency_id.id, frozendict(to_update)].add(line.id)
+
+        for tax_line_vals in tax_results["tax_lines_to_delete"]:
+            to_delete.append(tax_line_vals["record"].id)
+
+        for tax_line_vals in tax_results["tax_lines_to_add"]:
+            to_create.append(
+                {
+                    **{
+                        key: value
+                        for key, value in tax_line_vals.items()
+                        if key in item_fields
+                    },
+                    "display_type": "tax",
+                    "move_id": move.id,
+                }
+            )
+
+        for tax_line_vals, _grouping_key, to_update in tax_results[
+            "tax_lines_to_update"
+        ]:
+            line = tax_line_vals["record"]
+            if self._sync_tax_lines_is_write_needed(line, to_update):
+                grouped_update[line.currency_id.id, frozendict(to_update)].add(line.id)
+
     @contextmanager
-    def _sync_dynamic_lines(self, container):
+    def _sync_tax_lines(self, container):
+        """Create/update/delete tax lines to match their base lines' taxes.
+
+        Ported (behaviour-wise) from Odoo core ``AccountMove._sync_tax_lines``.
+        This is the "mechanical port, shim still alive" half of this
+        issue's two-commit landing (see the issue's Keputusan Desain) --
+        the ``is_invoice()``/``is_entry()``-gated branches, spread across
+        this method and its ``_sync_tax_lines_*`` helpers above (split out
+        only to keep every individual method under this repo's mccabe
+        complexity budget -- a structural deviation from upstream's own
+        single nested-closure-laden method, not a behavioural one), are
+        dead (permanently unreachable, since those shims always resolve
+        the same way here) but are kept structurally intact, and are only
+        pruned in the next commit.
+
+        **Two spots are, deliberately, not kept literal**, because unlike
+        every other dead branch here (which stays inert precisely because
+        Python never evaluates the untaken side of an
+        ``if``/``and``/``or``/ternary), these two are reached
+        *unconditionally* and reference fields upstream has
+        (``move_type``, ``invoice_currency_rate``, ``invoice_date``) but
+        that were never ported onto ``journal_entry`` by *any* unit, this
+        one included -- so keeping them verbatim would not be dead code,
+        it would be an immediate ``KeyError`` on every call:
+        ``_sync_tax_lines_snapshot``'s ``moves_before`` only tracks
+        ``currency_id``/``partner_id`` (upstream also tracks the three
+        fields above), and the ``elif`` branch that would set
+        ``round_from_tax_lines = 'reapply_currency_rate'`` when
+        ``invoice_currency_rate`` changes is omitted from
+        ``_sync_tax_lines_compute_round_from_tax_lines`` (falling straight
+        through to "skip this move" instead).
+
+        :param container: dict with a ``'records'`` key, holding only the
+            entries whose lines carry ``tax_ids``/``tax_repartition_line_id``
+            (see ``_sync_dynamic_lines``).
+        """
+        moves_before, base_lines_before, tax_lines_before = (
+            self._sync_tax_lines_snapshot(container)
+        )
+        yield
+
+        to_delete = []
+        to_create = []
+        grouped_update = defaultdict(set)
+        for move in container["records"]:
+            if move.state != "draft":
+                continue
+
+            tax_lines = self._sync_tax_lines_get_tax_lines(move)
+            base_lines = self._sync_tax_lines_get_base_lines(move)
+            round_from_tax_lines = self._sync_tax_lines_compute_round_from_tax_lines(
+                move,
+                moves_before,
+                base_lines,
+                tax_lines,
+                base_lines_before.get(move, {}),
+                tax_lines_before.get(move, {}),
+            )
+            if round_from_tax_lines is None:
+                continue
+            self._sync_tax_lines_collect(
+                move, round_from_tax_lines, to_delete, to_create, grouped_update
+            )
+
+        if grouped_update:
+            for (_currency_id, values), lines in grouped_update.items():
+                self.env["journal_entry.item"].browse(lines).write(dict(values))
+        if to_delete:
+            self.env["journal_entry.item"].browse(to_delete).unlink()
+        if to_create:
+            self.env["journal_entry.item"].create(to_create)
+
+    @contextmanager
+    def _sync_balancing_lines(self, container):
         """Auto-balance ``container['records']``'s lines around the wrapped block.
 
         Ported (framework-wise) from Odoo core
-        ``AccountMove._sync_dynamic_lines``, its stack trimmed to a single
-        stage: ``_sync_unbalanced_lines``. Upstream additionally
-        (re)computes rounding/cash-rounding/payment-term/tax lines here --
-        all out of this issue's scope, see the class docstring.
+        ``AccountMove._sync_unbalanced_lines`` (the contextmanager half of
+        upstream's own single sync stage, before this issue's tax stage
+        joined it as a second one -- see ``_sync_dynamic_lines``).
+        Unchanged behaviour-wise from the single-stage version this
+        method replaces: the docstring below is the same one that used
+        to sit directly on ``_sync_dynamic_lines``.
 
         :param container: dict with a ``'records'`` key, read again after
             the wrapped block runs (``create()`` only knows the final
@@ -826,6 +1280,42 @@ Solution: The entry is accounted on %(new_date)s instead
             move._sync_unbalanced_lines(
                 changed.filtered(lambda line, move=move: line.move_id == move)
             )
+
+    @contextmanager
+    def _sync_dynamic_lines(self, container):
+        """Run the two-stage sync (tax lines, then balancing) around the block.
+
+        Ported (framework-wise) from Odoo core ``AccountMove._sync_dynamic_lines``,
+        its ``ExitStack`` scaffold trimmed to exactly two stages --
+        ``_sync_balancing_lines`` and ``_sync_tax_lines`` -- upstream's
+        payment-term/discount/rounding/epd/invoice stages all being out
+        of this repo's scope (see the class docstring). Matching
+        upstream's own relative ordering (``_sync_unbalanced_lines`` at
+        sequence 20, ``_sync_tax_lines`` at sequence 50 -- entered
+        low-to-high), the balancing stage is *entered* first and the tax
+        stage second, so that on exit (``ExitStack`` unwinds
+        last-entered-first) the tax stage's post-yield code runs
+        *before* the balancing stage's: new/updated/deleted tax lines
+        must exist before the auto-balancing line is recomputed against
+        the entry's final line set.
+
+        :param container: dict with a ``'records'`` key, read again after
+            the wrapped block runs (``create()`` only knows the final
+            recordset once ``super().create()`` has returned).
+        """
+
+        def get_tax_container_records():
+            return container["records"].filtered(
+                lambda move: move.line_ids.tax_ids
+                or move.line_ids.tax_repartition_line_id
+            )
+
+        tax_container = {"records": get_tax_container_records()}
+        with ExitStack() as stack:
+            stack.enter_context(self._sync_balancing_lines(container))
+            stack.enter_context(self._sync_tax_lines(tax_container))
+            yield
+            tax_container["records"] = get_tax_container_records()
 
     def _sync_unbalanced_lines(self, lines):
         """Keep ``self`` balanced by adjusting a single auto-balancing line.

@@ -559,6 +559,30 @@ class JournalEntryItem(models.Model):
         records._compute_amount_currency()
         return records
 
+    def write(self, vals):
+        """Trigger the parent entry's tax/balancing sync around a direct write.
+
+        Necessary counterpart to ``journal_entry.write()``: the ORM
+        applies a one2many command like ``(1, id, vals)`` by calling this
+        model's own ``write()`` directly on the child, never re-entering
+        ``journal_entry.write()`` -- so without this override, editing a
+        line directly (the only way this repo's own "Journal Entry" form
+        edits an existing row today, and the natural way to write a test
+        against a single line) would bypass ``_sync_dynamic_lines``
+        entirely and no tax line would ever be (re)computed. Ported
+        (behaviour-wise, trimmed to this repo's scope -- no lock date/
+        hash/reconciliation/tracking machinery, none of which exists here
+        yet) from upstream ``AccountMoveLine.write``, which wraps its own
+        ``super().write()`` the same way for the same reason.
+        """
+        if not vals:
+            return True
+        moves = self.move_id
+        move_container = {"records": moves}
+        with moves._sync_dynamic_lines(move_container):
+            result = super().write(vals)
+        return result
+
     def _affect_tax_report(self):
         """Whether this line carries a tax that affects the tax report.
 

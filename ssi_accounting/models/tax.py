@@ -54,12 +54,14 @@ class Tax(models.Model):
       ``manual_total_excluded``/``manual_tax_amounts`` are still accepted
       as plain keyword arguments to ``_prepare_base_line_for_taxes_computation``,
       just not derived from a serialised blob).
-    - ``_prepare_tax_line_for_taxes_computation`` is not ported: nothing
-      in this repo yet builds "existing tax line" dicts, so the
-      ``tax_lines`` parameter accepted by ``_round_base_lines_tax_details``/
-      ``_prepare_tax_lines`` is always empty in practice. The parameter
-      and its (otherwise inert) handling are kept so the two methods
-      keep upstream's exact signature.
+    - ``_prepare_tax_line_for_taxes_computation`` (added by the tax
+      synchronisation unit, ``journal_entry``/``journal_entry.item``) is
+      the counterpart of ``_prepare_base_line_for_taxes_computation`` for
+      an *existing* tax-typed line, letting ``_round_base_lines_tax_details``/
+      ``_prepare_tax_lines`` tell which stored tax line a freshly
+      recomputed one matches (and therefore whether a manually edited
+      amount on it should be preserved) instead of always recomputing
+      from scratch.
     - Cash basis (``tax_exigibility``)/analytic/product tax-grid tags are
       not modelled here (see the class-level "Deliberately dropped" list
       below), so ``_add_accounting_data_to_base_line_tax_details`` always
@@ -532,6 +534,59 @@ class Tax(models.Model):
                     base_line[key] = value
 
         return base_line
+
+    @api.model
+    def _prepare_tax_line_for_taxes_computation(self, record, **kwargs):
+        """Convert an *existing* tax-typed line into the dict the engine uses.
+
+        Counterpart of ``_prepare_base_line_for_taxes_computation`` for a
+        line that already carries a ``tax_repartition_line_id`` (a
+        ``journal_entry.item`` with ``display_type == 'tax'``): its
+        current amounts are what ``_prepare_tax_lines`` matches a
+        recomputed grouping key against, to decide whether that stored
+        line should be updated, deleted, or left as-is because it was
+        edited manually. Ported (behaviour-wise) verbatim from upstream
+        ``account.tax._prepare_tax_line_for_taxes_computation``, with a
+        smaller field set (no ``analytic_distribution`` -- dropped from
+        ``journal_entry.item``, see that model's own docstring).
+
+        :param record: a representation of an existing tax line -- a
+            record or a dictionary.
+        :param kwargs: extra values overriding what would be taken from
+            ``record``.
+        :return: a dictionary representing a tax line.
+        """
+
+        def load(field, fallback):
+            return self._get_base_line_field_value_from_record(
+                record, field, kwargs, fallback
+            )
+
+        currency = (
+            load("currency_id", None)
+            or load("company_currency_id", None)
+            or load("company_id", self.env["res.company"]).currency_id
+            or self.env["res.currency"]
+        )
+
+        return {
+            **kwargs,
+            "record": record,
+            "id": load("id", 0),
+            "tax_repartition_line_id": load(
+                "tax_repartition_line_id", self.env["tax.repartition_line"]
+            ),
+            "group_tax_id": load("group_tax_id", self.env["tax"]),
+            "tax_ids": load("tax_ids", self.env["tax"]),
+            "tax_tag_ids": load("tax_tag_ids", self.env["account.tag"]),
+            "currency_id": currency,
+            "partner_id": load("partner_id", self.env["res.partner"]),
+            "account_id": load("account_id", self.env["account.account"]),
+            "analytic_distribution": load("analytic_distribution", None),
+            "sign": load("sign", 1.0),
+            "amount_currency": load("amount_currency", 0.0),
+            "balance": load("balance", 0.0),
+        }
 
     # -------------------------------------------------------------------
     # TAXES COMPUTATION: BATCHING & EVALUATION
