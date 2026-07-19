@@ -47,6 +47,7 @@ class AccountRoot(models.Model):
 
     @api.private
     def browse(self, ids=()):
+        """Wrap 'ids' into a tuple when a single root code string is given."""
         if isinstance(ids, str):
             ids = (ids,)
         return super().browse(ids)

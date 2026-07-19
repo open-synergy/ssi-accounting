@@ -107,6 +107,7 @@ class MixinSequenceNumber(models.AbstractModel):
     )
 
     def init(self):
+        """Create the sequence-lookup indexes a concrete model needs (install hook)."""
         # Add an index to optimise the query searching for the highest
         # sequence number
         if not self._abstract and self._sequence_index:
@@ -182,6 +183,7 @@ class MixinSequenceNumber(models.AbstractModel):
         return self.env.cr.cache.setdefault("mixin.sequence_number", {})
 
     def write(self, vals):
+        """Write 'vals', clearing the per-transaction sequence cache when needed."""
         if self._sequence_field in vals and self.env.context.get(
             "clear_sequence_mixin_cache", True
         ):

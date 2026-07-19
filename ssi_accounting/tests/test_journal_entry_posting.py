@@ -10,4 +10,5 @@ from odoo.tests import tagged
 @tagged("post_install", "-at_install")
 class TestJournalEntryPosting(YamlTransactionCase):
     def test_journal_entry_posting(self):
+        """Run the YAML scenarios for the posting/numbering state machine."""
         self.run_yaml_scenario("test_data_journal_entry_posting.yaml")

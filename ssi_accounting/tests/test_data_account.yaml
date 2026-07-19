@@ -96,6 +96,56 @@ scenarios:
         save_as: "result"
         expect_count: 0
 
+  - name: "Deleting an account that contains journal items is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Delete Guard Journal"
+          type: "general"
+      - step: "Create the account under test"
+        action: "create"
+        model: "account.account"
+        save_as: "used_account"
+        values:
+          name: "Used Account"
+          account_type: "asset_current"
+          code: "900006"
+      - step: "Create the offsetting account"
+        action: "create"
+        model: "account.account"
+        save_as: "other_account"
+        values:
+          name: "Offsetting Account"
+          account_type: "income"
+          code: "900007"
+      - step: "Create a draft entry with a line on the account under test"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: used_account.id"
+                debit: 15.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: other_account.id"
+                debit: 0.0
+                credit: 15.0
+      - step: "Deleting the account is rejected"
+        action: "unlink"
+        target: "used_account"
+        expect_error:
+          type: "UserError"
+          message_contains: "journal items"
+
   - name: "internal_group is derived from every account_type value"
     steps:
       - step: "asset_receivable -> asset"

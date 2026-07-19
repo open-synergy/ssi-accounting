@@ -10,4 +10,5 @@ from odoo.tests import tagged
 @tagged("post_install", "-at_install")
 class TestSecurityGroups(YamlTransactionCase):
     def test_security_groups(self):
+        """Run the YAML scenarios for the module's security groups."""
         self.run_yaml_scenario("test_data_security_groups.yaml")

@@ -214,12 +214,14 @@ Solution: Pick a parent group that is not one of this group's own
 
     @api.model_create_multi
     def create(self, vals_list):
+        """Create groups, then re-derive account/parent-group membership."""
         groups = super().create([self._sanitize_vals(vals) for vals in vals_list])
         groups._adapt_accounts_for_account_groups()
         groups._adapt_parent_account_group()
         return groups
 
     def write(self, vals):
+        """Write 'vals', re-deriving membership when the code prefix changes."""
         res = super().write(self._sanitize_vals(vals))
         if "code_prefix_start" in vals or "code_prefix_end" in vals:
             self._adapt_accounts_for_account_groups()
@@ -227,6 +229,7 @@ Solution: Pick a parent group that is not one of this group's own
         return res
 
     def unlink(self):
+        """Re-parent accounts and child groups to 'parent_id' before deleting."""
         for record in self:
             if "account.account" in self.env:
                 account_ids = self.env["account.account"].search(

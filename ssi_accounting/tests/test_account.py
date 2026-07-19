@@ -10,4 +10,5 @@ from odoo.tests import tagged
 @tagged("post_install", "-at_install")
 class TestAccount(YamlTransactionCase):
     def test_account(self):
+        """Run the YAML scenarios for 'account.account'."""
         self.run_yaml_scenario("test_data_account.yaml")

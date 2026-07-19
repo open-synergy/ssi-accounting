@@ -608,6 +608,7 @@ class JournalEntry(models.Model):
     # ======================================================================
 
     def action_post(self):
+        """Post every entry in 'self' (button handler for '_post')."""
         if self:
             self._post()
         return False
@@ -812,6 +813,7 @@ Solution: The entry is accounted on %(new_date)s instead
     # opens it.
 
     def action_reverse(self):
+        """Open the reversal wizard for every entry in 'self'."""
         # NOT '.sudo()' -- unlike the generic SSI button pattern, this
         # method only ever opens a wizard (no cross-model read that
         # needs elevated access), and '_post()' (reached later, once the
@@ -844,6 +846,7 @@ Solution: The entry is accounted on %(new_date)s instead
         }
 
     def action_view_reversal_moves(self):
+        """Open the reversal entries of every entry in 'self' (smart button)."""
         for record in self:
             result = record._view_reversal_moves()
         return result
@@ -1027,8 +1030,8 @@ Solution: The entry is accounted on %(new_date)s instead
         ``AccountMove._unlink_or_reverse`` -- a utility a later unit can
         call to get rid of a journal entry without ever hard-deleting
         one that was posted. Not wired to any button in this issue (see
-        its "Tidak termasuk" section); ported now so a later unit's own
-        Kriteria Penerimaan does not have to re-derive it from scratch.
+        its out-of-scope section); ported now so a later unit's own
+        acceptance criteria does not have to re-derive it from scratch.
         """
         if not self:
             return

@@ -499,6 +499,67 @@ scenarios:
             type: "value"
             expected: "cancel"
 
+  - name: "Cancelling an already-cancelled entry is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 7"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 7A"
+          account_type: "asset_current"
+          code: "JEP7A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 7B"
+          account_type: "income"
+          code: "JEP7B"
+      - step: "Create a draft entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-03
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 5.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 5.0
+      - step: "Cancel the entry"
+        action: "call"
+        target: "entry"
+        method: "button_cancel"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "cancel"
+      - step: "Cancelling it a second time is rejected"
+        action: "call"
+        target: "entry"
+        method: "button_cancel"
+        as_user: "base.user_admin"
+        expect_error:
+          type: "UserError"
+          message_contains: "Only draft or posted"
+
   - name: "Posting an entry with no lines is rejected"
     steps:
       - step: "Create a journal"

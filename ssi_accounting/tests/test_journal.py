@@ -12,14 +12,15 @@ from odoo.tools import mute_logger
 @tagged("post_install", "-at_install")
 class TestJournal(YamlTransactionCase):
     def test_journal(self):
+        """Run the YAML scenarios for 'account.journal'."""
         self.run_yaml_scenario("test_data_journal.yaml")
 
     def test_duplicate_code_in_same_company_raises_integrity_error(self):
-        """Python murni -- pemicu P5 (L-22: `expect_error.type` tidak
-        mencakup `psycopg2.IntegrityError`; keunikan `(code, company_id)`
-        ditegakkan lewat `models.Constraint` di level SQL -- bukan
-        `@api.constrains` -- sehingga kegagalannya tidak bisa diuji lewat
-        `expect_error` di YAML).
+        """Pure Python -- trigger P5 (L-22: `expect_error.type` does not
+        cover `psycopg2.IntegrityError`; the `(code, company_id)`
+        uniqueness is enforced through a SQL-level `models.Constraint` --
+        not `@api.constrains` -- so its failure cannot be tested through
+        YAML's `expect_error`).
         """
         company = self.env.company
         self.env["account.journal"].create(
@@ -41,13 +42,13 @@ class TestJournal(YamlTransactionCase):
             )
 
     def test_copy_data_regenerates_a_fresh_code(self):
-        """Python murni -- pemicu P1 (L-01: `action: call` membuang nilai
-        balik method, dan `copy()`/`copy_data()` tidak termasuk aksi yang
-        mengisi registry di YAML; satu-satunya cara memeriksa vals yang
-        dihasilkan `copy_data()` -- terutama bahwa `code` dikeluarkan dari
-        vals (bukan sekadar diisi `False`) agar `_compute_code`
-        membuatkan kode baru yang unik -- adalah menangkap nilai baliknya
-        langsung).
+        """Pure Python -- trigger P1 (L-01: `action: call` discards a
+        method's return value, and `copy()`/`copy_data()` are not among
+        the actions that populate YAML's registry; the only way to check
+        the vals `copy_data()` produces -- specifically that `code` is
+        excluded from vals altogether (not merely set to `False`) so that
+        `_compute_code` generates a fresh, unique code -- is to capture
+        its return value directly).
         """
         journal = self.env["account.journal"].create(
             {"name": "Original", "code": "CPY01", "type": "general"}

@@ -2170,6 +2170,7 @@ class Tax(models.Model):
         }
 
     def copy_data(self, default=None):
+        """Suffix the copied tax's name with '(copy)' unless 'default' overrides it."""
         default = dict(default or {})
         vals_list = super().copy_data(default=default)
         for tax, vals in zip(self, vals_list, strict=True):

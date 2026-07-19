@@ -1895,3 +1895,94 @@ scenarios:
         expect_error:
           type: "UserError"
           message_contains: "gain exchange rate account is configured"
+
+  - name: "Resetting a reconciled entry to draft is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Draft Guard Journal"
+          type: "general"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        values:
+          name: "Reconcile Draft Guard Receivable"
+          account_type: "asset_receivable"
+          code: "RECDGAR"
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Reconcile Draft Guard Income"
+          account_type: "income"
+          code: "RECDGINC"
+      - step: "Create and post the debit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 300.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 300.0
+      - step: "Post the debit-side entry"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post the credit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-02
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 0.0
+                credit: 300.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 300.0
+                credit: 0.0
+      - step: "Post the credit-side entry"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find both receivable lines as one recordset"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconcile them"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+      - step: "Resetting the debit-side entry to draft is rejected"
+        action: "call"
+        target: "entry1"
+        method: "button_draft"
+        as_user: "base.user_admin"
+        expect_error:
+          type: "UserError"
+          message_contains: "reconciled entries"

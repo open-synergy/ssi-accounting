@@ -10,20 +10,21 @@ from odoo.tests import tagged
 
 @tagged("post_install", "-at_install")
 class TestTaxComputation(YamlTransactionCase):
-    """Python murni -- pemicu P2 (L-04: tidak ada toleransi float di YAML;
-    seluruh assert di sini adalah nilai moneter hasil perhitungan pajak) dan
-    P11 (L-12: matriks kasus rujukan >= 5 varian, assert identik hanya
-    input berbeda) dari `python-escape-hatch.md`.
+    """Pure Python -- trigger P2 (L-04: no float tolerance in YAML; every
+    assert here is a monetary value produced by tax computation) and P11
+    (L-12: a reference-case matrix with >= 5 variants, identical asserts
+    with only the input differing) from `python-escape-hatch.md`.
 
-    Tidak ada skenario YAML yang menyertai file ini -- mesin perhitungan
-    pajak (`compute_all`/`_get_tax_details`/`_add_tax_details_in_base_line`/
-    ...) beroperasi murni di atas `dict`, tanpa membaca/menulis record,
-    sehingga tak ada apa pun untuk `action: assert` sasar lewat lookup
-    `REC:`.
+    No YAML scenario accompanies this file -- the tax computation engine
+    (`compute_all`/`_get_tax_details`/`_add_tax_details_in_base_line`/
+    ...) operates purely on `dict`s, never reading/writing a record, so
+    there is nothing for a YAML `action: assert` to target through a
+    `REC:` lookup.
     """
 
     @classmethod
     def setUpClass(cls):
+        """Create the shared currency/tax group fixtures for every test."""
         super().setUpClass()
         cls.currency = cls.env.company.currency_id
         cls.tax_group = cls.env["tax_group"].create({"name": "VAT Group"})
@@ -33,15 +34,15 @@ class TestTaxComputation(YamlTransactionCase):
         return self.env["tax"].create(vals)
 
     def test_reference_cases_percent_fixed_division_group(self):
-        """Tabel kasus rujukan: persen, tetap (fixed), division, dan group.
+        """Reference case table: percent, fixed, division, and group.
 
-        Kriteria Penerimaan: "Pajak persen, tetap, division, dan group
-        menghasilkan angka yang sama dengan Odoo 19 pada tabel kasus
-        rujukan". Angka yang diharapkan adalah aritmetika pajak yang sama
-        persis dengan formula `_eval_tax_amount_price_excluded`/
-        `_eval_tax_amount_fixed_amount` yang diport dari Odoo 19 --
-        dipilih dengan angka bersih (tanpa sisa desimal) supaya tidak ada
-        ambiguitas pembulatan yang bisa menyamarkan sebuah bug port.
+        Acceptance criteria: "Percent, fixed, division, and group taxes
+        produce the same figures as Odoo 19 on the reference case table".
+        The expected figures are the exact same tax arithmetic as the
+        `_eval_tax_amount_price_excluded`/`_eval_tax_amount_fixed_amount`
+        formulas ported from Odoo 19 -- chosen with clean numbers (no
+        decimal remainder) so no rounding ambiguity can mask a porting
+        bug.
         """
 
         def one_percent_tax(name, amount, sequence=1):
@@ -113,8 +114,8 @@ class TestTaxComputation(YamlTransactionCase):
                 )
 
     def test_price_included_tax_gives_correct_base_and_amount(self):
-        """Kriteria Penerimaan: "Pajak price-included menghasilkan basis
-        dan nominal yang benar".
+        """Acceptance criteria: "A price-included tax produces the
+        correct base and amount".
         """
         tax = self._create_tax(
             name="VAT 10% Included",
@@ -130,8 +131,8 @@ class TestTaxComputation(YamlTransactionCase):
         self.assertAlmostEqual(result["total_included"], 110.0, places=2)
 
     def test_include_base_amount_raises_subsequent_tax_base(self):
-        """Kriteria Penerimaan: "Kaskade `include_base_amount` menaikkan
-        basis pajak berikutnya".
+        """Acceptance criteria: "An `include_base_amount` cascade raises
+        the next tax's base".
 
         `tax_base` (fixed, 10, `include_base_amount`) is evaluated first
         (sequence 1) and pushes its own tax amount into `tax_percent`'s
@@ -159,8 +160,8 @@ class TestTaxComputation(YamlTransactionCase):
         self.assertAlmostEqual(result["total_included"], 121.0, places=2)
 
     def test_negative_factor_repartition_line_has_correct_sign(self):
-        """Kriteria Penerimaan: "Repartition berfaktor negatif menghasilkan
-        nominal bertanda benar".
+        """Acceptance criteria: "A negative-factor repartition line
+        produces a correctly-signed amount".
 
         A 5% tax split 150%/-50% across two 'tax' repartition lines (they
         still sum to 100%, satisfying the existing 100% constraint) has
@@ -210,8 +211,8 @@ class TestTaxComputation(YamlTransactionCase):
         self.assertAlmostEqual(result["total_included"], 100.0, places=2)
 
     def test_round_per_line_and_round_globally_differ_on_three_lines(self):
-        """Kriteria Penerimaan: "`round_per_line` dan `round_globally`
-        memberi hasil berbeda pada kasus tiga baris 11%".
+        """Acceptance criteria: "`round_per_line` and `round_globally`
+        give different results on a three-line 11% case".
 
         Three identical lines (price_unit=10.15, 11%) each round their own
         tax amount to 1.12 under 'round_per_line' (3 * 1.12 = 3.36), while
@@ -262,11 +263,10 @@ class TestTaxComputation(YamlTransactionCase):
                 self.assertAlmostEqual(total_tax, expected_total, places=2)
 
     def test_base_line_field_fallback_does_not_raise_on_missing_field(self):
-        """Kriteria Penerimaan: "Baris yang tidak memiliki suatu field
-        tetap terproses berkat fallback
-        `_get_base_line_field_value_from_record`".
+        """Acceptance criteria: "A row missing a field is still processed
+        thanks to the `_get_base_line_field_value_from_record` fallback".
 
-        Negatif (Skenario Uji): a plain dict 'record' missing the
+        Negative case: a plain dict 'record' missing the
         'product_uom_id' key entirely must not raise `AttributeError` --
         if the fallback is broken, building the base line itself raises.
         """

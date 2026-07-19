@@ -76,6 +76,12 @@ Design decisions
   JSONB lookup. ``account.code.mapping`` (the "Mapping" tab on the account form) is
   ported alongside it, unchanged from upstream apart from pointing at this module's
   own ``account.account``.
+* This module ships **no chart of accounts data** of its own -- ``account.account``/
+  ``account.group``/``account.tag`` are structural models only, with no demo or
+  installable CoA records anywhere in this module. A country-specific chart of
+  accounts (e.g. the Indonesian standard CoA) is deliberately left to a separate,
+  dedicated module that depends on this one, exactly like upstream Odoo splits
+  ``account`` from its localization packages (``l10n_id``, ...).
 * ``account.account`` still does **not** have ``tax_ids``: a Many2many field
   needs a real comodel at registry-build time, so it must wait for a later unit
   to add it back via inheritance. ``_onchange_account_type`` (whose only job
@@ -83,6 +89,14 @@ Design decisions
   self._fields`` for that reason. ``related_taxes_amount``/
   ``action_open_related_taxes`` only needed the ``tax`` model itself (not
   ``tax_ids``) and now work for real, now that ``tax`` exists.
+* ``account.journal.type`` only has two values: ``general`` (Miscellaneous, for
+  day-to-day manual entries) and ``situation`` (Opening/Closing, for fiscal year
+  opening and closing entries). Upstream ``account.journal``'s ``sale``/
+  ``purchase``/``cash``/``bank``/``credit`` types are all dropped: this repo has no
+  sale/purchase documents and no bank/cash statement reconciliation (out of scope,
+  see the reconciliation bullets below), so neither of the type-specific behaviours
+  those upstream values gate (default sequence prefixes, payment-method lines,
+  statement import) has anywhere to attach to.
 * ``journal_entry`` and its child ``journal_entry.item`` are ported (behaviour-wise)
   from Odoo core's ``account.move``/``account.move.line``, because those models
   live inside the ``account`` module, which ``ssi_accounting`` must not depend
@@ -111,7 +125,15 @@ Design decisions
   reconciliation unit adds the fields it reads) and never clears ``name``.
   ``made_sequence_gap`` is likewise declared but not maintained by any
   cascade in this unit -- the exchange-difference posting cascade upstream
-  triggers from ``_post`` is a later multi-currency unit's job.
+  triggers from ``_post`` is a later multi-currency unit's job. This mixin
+  (``models/mixin_sequence_number.py``) is itself a behaviour-wise port of
+  upstream ``sequence.mixin`` (``addons/account/models/sequence_mixin.py``),
+  deliberately **not** ``mixin.sequence`` from ``ssi_sequence_mixin``: that
+  mixin numbers a document from an externally configured ``sequence.template``
+  + ``ir.sequence`` pair and has no notion of the document's own accounting
+  date, so it cannot express year-reset-on-date or per-journal gaplessness.
+  Consequently this module does not depend on ``ssi_sequence_mixin`` and does
+  not participate in its ``sequence.template`` configurator at all.
 * ``amount_total_debit``/``amount_total_credit`` are ``journal_entry``'s only
   aggregate fields -- the whole invoice-flavoured amount block
   (``amount_untaxed``/``amount_tax``/``amount_total``/``amount_residual`` and
@@ -123,6 +145,14 @@ Design decisions
   synchronisation unit's ported code (behaviour-gated on them) landed; now
   that it has, every branch that depended on them was pruned and the shims
   themselves were deleted.
+* ``res.partner`` is **not** inherited anywhere in this module; ``journal_entry``/
+  ``journal_entry.item.partner_id`` is a plain, uninherited Many2one to it, used only
+  to tag a line with who it concerns. Accounting-specific partner fields (payment
+  terms, fiscal position, trust level, ...) are not this module's concern and belong
+  to a future invoice-flavoured repo that actually needs them. Payment terms and
+  fiscal position are consequently out of scope here too, same as cash basis and the
+  hash chain (see above) and analytic distribution (see the ``account.tax`` drop list
+  below) -- none of the four has any field, model, or hook anywhere in this module.
 * ``journal_entry.item`` keeps ``product_id``/``quantity``/``price_unit``/
   ``price_subtotal`` (a deliberate product decision), but purely as
   informational fields: the tax base for an ``entry``-typed line is

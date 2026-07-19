@@ -128,11 +128,14 @@ Solution: Select only posted journal entries
         return action
 
     def action_reverse_moves(self):
-        # NOT '.sudo()' -- 'journal_entry._post()' (reached from
-        # '_confirm_reverse' -> 'journal_entry._reverse_moves') keys its
-        # own accounting-group check off 'self.env.su'; sudo-ing here
-        # would silently bypass it for every user. See
-        # 'journal_entry.action_reverse''s own note.
+        """Reverse every wizard's 'move_ids' and return the resulting action.
+
+        NOT '.sudo()' -- 'journal_entry._post()' (reached from
+        '_confirm_reverse' -> 'journal_entry._reverse_moves') keys its
+        own accounting-group check off 'self.env.su'; sudo-ing here
+        would silently bypass it for every user. See
+        'journal_entry.action_reverse''s own note.
+        """
         for wizard in self:
             result = wizard._confirm_reverse()
         return result

@@ -12,17 +12,18 @@ from odoo.tools import mute_logger
 @tagged("post_install", "-at_install")
 class TestJournalEntry(YamlTransactionCase):
     def test_journal_entry(self):
+        """Run the YAML scenarios for 'journal_entry'/'journal_entry.item'."""
         self.run_yaml_scenario("test_data_journal_entry.yaml")
 
     def test_product_line_without_account_id_raises_integrity_error(self):
-        """Python murni -- pemicu P5 (L-22: `expect_error.type` tidak
-        mencakup `psycopg2.IntegrityError`). `account_id` sengaja bukan
-        `required=True` di level field (lihat docstring kelas
-        `JournalEntryItem`) -- keharusannya untuk baris `display_type`
-        `product`/`tax` ditegakkan oleh SQL `CHECK`
-        `_check_accountable_required_fields`, yang gagal sebagai
-        `IntegrityError` mentah di database, bukan salah satu dari 12
-        tipe exception yang dikenal `expect_error`.
+        """Pure Python -- trigger P5 (L-22: `expect_error.type` does not
+        cover `psycopg2.IntegrityError`). `account_id` is deliberately not
+        `required=True` at the field level (see the `JournalEntryItem`
+        class docstring) -- its requiredness for `product`/`tax`
+        `display_type` rows is enforced by the SQL `CHECK`
+        `_check_accountable_required_fields`, which fails as a raw
+        `IntegrityError` at the database, not one of the 12 exception
+        types `expect_error` recognises.
         """
         journal = self.env["account.journal"].create(
             {"name": "No Account Journal", "type": "general"}
@@ -45,10 +46,10 @@ class TestJournalEntry(YamlTransactionCase):
             )
 
     def test_tax_line_without_account_id_raises_integrity_error(self):
-        """Python murni -- pemicu P5 (L-22), sama seperti test di atas
-        tapi untuk `display_type` `tax`: `_check_accountable_required_fields`
-        menegakkan `account_id` untuk `product`/`tax` sama-sama, bukan
-        hanya `product`.
+        """Pure Python -- trigger P5 (L-22), same as the test above but
+        for `display_type` `tax`: `_check_accountable_required_fields`
+        enforces `account_id` for `product`/`tax` alike, not just
+        `product`.
         """
         journal = self.env["account.journal"].create(
             {"name": "No Account Tax Journal", "type": "general"}
@@ -68,10 +69,10 @@ class TestJournalEntry(YamlTransactionCase):
             )
 
     def test_section_line_with_account_id_raises_integrity_error(self):
-        """Python murni -- pemicu P5 (L-22). `_check_non_accountable_fields_null`
-        menolak baris `line_section`/`line_note` yang justru diisi
-        `account_id` -- SQL `CHECK`, bukan `@api.constrains`, jadi
-        gagalnya sebagai `IntegrityError` mentah, bukan `UserError`.
+        """Pure Python -- trigger P5 (L-22). `_check_non_accountable_fields_null`
+        rejects a `line_section`/`line_note` row that is given an
+        `account_id` -- a SQL `CHECK`, not `@api.constrains`, so it fails
+        as a raw `IntegrityError`, not a `UserError`.
         """
         journal = self.env["account.journal"].create(
             {"name": "Section With Account Journal", "type": "general"}
@@ -102,9 +103,9 @@ class TestJournalEntry(YamlTransactionCase):
             )
 
     def test_note_line_with_nonzero_debit_raises_integrity_error(self):
-        """Python murni -- pemicu P5 (L-22). `_check_non_accountable_fields_null`
-        juga menolak baris `line_note` yang `debit`-nya bukan nol, walau
-        `account_id`-nya kosong.
+        """Pure Python -- trigger P5 (L-22). `_check_non_accountable_fields_null`
+        also rejects a `line_note` row whose `debit` is non-zero, even
+        though its `account_id` is empty.
         """
         journal = self.env["account.journal"].create(
             {"name": "Note With Debit Journal", "type": "general"}
@@ -128,12 +129,12 @@ class TestJournalEntry(YamlTransactionCase):
             )
 
     def test_cumulated_balance_runs_over_lines_in_date_order(self):
-        """Python murni -- pemicu P3 (L-06: perbandingan o2m/m2m di YAML
-        berbasis `set`, urutan baris TIDAK PERNAH bisa di-assert, dan
-        tidak ada assert per-baris. `cumulated_balance` hanya bermakna
-        relatif terhadap urutan recordset saat dibaca -- satu-satunya
-        cara memeriksa nilainya per-baris adalah membaca recordset
-        terurut langsung di Python).
+        """Pure Python -- trigger P3 (L-06: YAML's o2m/m2m comparison is
+        `set`-based, row order can NEVER be asserted, and there is no
+        per-row assert. `cumulated_balance` only makes sense relative to
+        the recordset's order as read -- the only way to check its
+        per-row values is to read the ordered recordset directly in
+        Python).
         """
         journal = self.env["account.journal"].create(
             {"name": "CB Journal", "type": "general"}

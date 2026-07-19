@@ -12,14 +12,15 @@ from odoo.tools import mute_logger
 @tagged("post_install", "-at_install")
 class TestTax(YamlTransactionCase):
     def test_tax(self):
+        """Run the YAML scenarios for 'tax'."""
         self.run_yaml_scenario("test_data_tax.yaml")
 
     def test_create_without_tax_group_raises_integrity_error(self):
-        """Python murni -- pemicu P5 (L-22: `expect_error.type` tidak
-        mencakup `psycopg2.IntegrityError`; `tax_group_id` wajib diisi
-        ditegakkan lewat NOT NULL di level SQL -- bukan `@api.constrains`
-        -- sehingga kegagalannya tidak bisa diuji lewat `expect_error` di
-        YAML).
+        """Pure Python -- trigger P5 (L-22: `expect_error.type` does not
+        cover `psycopg2.IntegrityError`; the requiredness of
+        `tax_group_id` is enforced through a SQL-level NOT NULL -- not
+        `@api.constrains` -- so its failure cannot be tested through
+        YAML's `expect_error`).
         """
         with self.assertRaises(IntegrityError), mute_logger("odoo.sql_db"):
             self.env["tax"].create(

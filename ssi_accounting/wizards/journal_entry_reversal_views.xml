@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2026 OpenSynergy Indonesia
+     Copyright 2026 PT. Simetri Sinergi Indonesia
+     License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl). -->
 <odoo>
     <record id="journal_entry_reversal_view_form" model="ir.ui.view">
         <field name="name">journal_entry_reversal - form</field>

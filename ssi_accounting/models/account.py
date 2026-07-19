@@ -119,8 +119,8 @@ class AccountAccount(models.Model):
     ``_check_account_code`` (alphanumeric code format) and
     ``_check_reconcile``/``_constrains_reconcile`` (receivable/payable
     reconcile requirement, off-balance tax/reconcile guard) -- none of
-    these are in the issue's enumerated "Constraint yang dipertahankan"
-    list. ``description`` is dropped along with them, so
+    these are in the issue's enumerated "constraints to keep" list.
+    ``description`` is dropped along with them, so
     ``_compute_display_name``/``_search_display_name`` below only compare
     ``code``/``name``, not a description snippet.
     """
@@ -862,6 +862,7 @@ Solution: Set the account code manually
         return NotImplemented
 
     def action_open_related_taxes(self):
+        """Open the list of 'tax' records that use 'self' on a repartition line."""
         self.ensure_one()
         if "tax" not in self.env:
             return {"type": "ir.actions.act_window_close"}
@@ -880,6 +881,7 @@ Solution: Set the account code manually
 
     @api.model_create_multi
     def create(self, vals_list):
+        """Create accounts grouped by 'company_ids', then enforce code uniqueness."""
         records_list = []
         # `company_ids` raw values are plain lists (Command tuples/ids), which
         # are not hashable -- `odoo.tools.groupby`'s dict-based grouping would
@@ -915,6 +917,7 @@ Solution: Set the account code manually
         return records
 
     def write(self, vals):
+        """Toggle reconcile side effects and guard a currency change in use."""
         if "reconcile" in vals:
             if vals["reconcile"]:
                 self.filtered(lambda r: not r.reconcile)._toggle_reconcile_to_true()

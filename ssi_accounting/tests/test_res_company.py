@@ -12,13 +12,14 @@ from odoo.tests import tagged
 @tagged("post_install", "-at_install")
 class TestResCompany(YamlTransactionCase):
     def test_res_company(self):
+        """Run the YAML scenarios for the phase-1 accounting configuration fields."""
         self.run_yaml_scenario("test_data_res_company.yaml")
 
     def test_get_lock_date_violations_returns_violated_fields(self):
-        """Python murni -- pemicu P1 (L-01: `action: call` membuang nilai
-        balik method; `_get_lock_date_violations`/`_format_lock_dates`
-        tidak mengubah record apa pun, satu-satunya cara mengujinya adalah
-        menangkap nilai balik langsung).
+        """Pure Python -- trigger P1 (L-01: `action: call` discards a
+        method's return value; `_get_lock_date_violations`/
+        `_format_lock_dates` do not change any record, the only way to
+        test them is to capture their return value directly).
         """
         company = self.env.company
         company.write(

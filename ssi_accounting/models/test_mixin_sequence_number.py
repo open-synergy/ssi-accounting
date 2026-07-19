@@ -85,6 +85,7 @@ class TestMixinSequenceNumber(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        """Create records, assigning a sequence number to any left as '/'."""
         records = super().create(vals_list)
         for record in records:
             if record.name == "/":
