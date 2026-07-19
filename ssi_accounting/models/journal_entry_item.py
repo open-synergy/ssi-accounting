@@ -2071,8 +2071,10 @@ Solution: Enable "Allow Reconciliation" on the account first
             callers.
         :param company: fallback company, used only if 'self' is empty.
         :param exchange_date: date to stamp the entry with.
-        :return: a dict with keys 'move_values' (create() vals) and
-            'to_reconcile' (a list of '(line, sequence)' tuples).
+        :return: a dict with keys 'move_values' (create() vals),
+            'to_reconcile' (a list of '(line, sequence)' tuples) and
+            'amount_currency_fixups' (a list of '(sequence, amount_currency)'
+            tuples -- see '_create_exchange_difference_moves').
         """
         company = (self.move_id.company_id or company)[:1]
         if not company:
@@ -2085,6 +2087,7 @@ Solution: Enable "Allow Reconciliation" on the account first
             "line_ids": [],
         }
         to_reconcile = []
+        amount_currency_fixups = []
         for line, amounts in zip(self, amounts_list, strict=False):
             move_vals["date"] = max(move_vals["date"], line.date)
 
@@ -2109,21 +2112,27 @@ Solution: Enable "Allow Reconciliation" on the account first
                 company, amount_residual_to_fix
             )
             sequence = len(move_vals["line_ids"])
-            # 'balance' (not 'debit'/'credit') is used here, deliberately
-            # matching '_prepare_reversal_line_vals''s own proven pattern
-            # -- see the class docstring's warning: giving 'debit'/
-            # 'credit' *and* 'amount_currency' together on the same
-            # create() vals lets 'amount_currency''s inverse clobber the
-            # 'balance' 'debit'/'credit''s own inverse just set, silently
-            # zeroing out this line whenever 'amount_currency' is 0
-            # (exactly the "amount_residual" branch above). 'balance' has
-            # no such conflict: it is the primary field the other three
-            # fill directions resolve back into.
+            # 'amount_currency' is deliberately left out of 'line_vals'
+            # below and fixed up via raw SQL afterwards instead (see
+            # '_create_exchange_difference_moves') -- giving both
+            # 'balance'/'debit'/'credit' *and* 'amount_currency' on the
+            # same create() vals does not reliably keep the given
+            # 'balance': 'amount_currency''s own inverse
+            # ('_inverse_amount_currency') unconditionally re-derives
+            # 'balance' from 'amount_currency'/'currency_rate' whenever
+            # 'amount_currency' is present in vals, silently clobbering
+            # whatever 'balance' was also given -- exactly the ordering
+            # pitfall the class docstring warns about for 'debit'/
+            # 'credit', just one level removed. Since this exchange fix
+            # is deliberately *not* rate-consistent by construction (an
+            # 'amount_residual' fix always wants 'amount_currency == 0'
+            # regardless of the line's real currency rate), there is no
+            # vals combination that survives the inverse; only a
+            # straight post-create UPDATE does.
             line_vals = [
                 {
                     "name": self.env._("Currency exchange rate difference"),
                     "balance": -amount_residual,
-                    "amount_currency": -amount_residual_currency,
                     "full_reconcile_id": line.full_reconcile_id.id,
                     "account_id": line.account_id.id,
                     "currency_id": line.currency_id.id,
@@ -2133,7 +2142,6 @@ Solution: Enable "Allow Reconciliation" on the account first
                 {
                     "name": self.env._("Currency exchange rate difference"),
                     "balance": amount_residual,
-                    "amount_currency": amount_residual_currency,
                     "account_id": exchange_line_account.id,
                     "currency_id": line.currency_id.id,
                     "partner_id": line.partner_id.id,
@@ -2142,8 +2150,64 @@ Solution: Enable "Allow Reconciliation" on the account first
             ]
             move_vals["line_ids"] += [Command.create(vals) for vals in line_vals]
             to_reconcile.append((line, sequence))
+            amount_currency_fixups.append((sequence, -amount_residual_currency))
+            amount_currency_fixups.append((sequence + 1, amount_residual_currency))
 
-        return {"move_values": move_vals, "to_reconcile": to_reconcile}
+        return {
+            "move_values": move_vals,
+            "to_reconcile": to_reconcile,
+            "amount_currency_fixups": amount_currency_fixups,
+        }
+
+    @api.model
+    def _fixup_exchange_move_amount_currency(
+        self, exchange_moves, exchange_diff_values_list
+    ):
+        """Force 'amount_currency' to the exact value each exchange line needs.
+
+        Bypasses the ORM entirely (raw SQL, then cache invalidation) --
+        see '_prepare_exchange_difference_move_vals''s own comment on why
+        no combination of create() vals survives 'amount_currency''s
+        inverse for a deliberately rate-inconsistent value.
+
+        :param exchange_moves: freshly created 'journal_entry' records,
+            in the same order as 'exchange_diff_values_list'.
+        :param exchange_diff_values_list: list of
+            '_prepare_exchange_difference_move_vals'\' return values.
+        """
+        fixup_rows = []
+        for exchange_move, exchange_diff_values in zip(
+            exchange_moves, exchange_diff_values_list, strict=False
+        ):
+            lines_by_sequence = {line.sequence: line for line in exchange_move.line_ids}
+            for sequence, amount_currency in exchange_diff_values[
+                "amount_currency_fixups"
+            ]:
+                line = lines_by_sequence.get(sequence)
+                if line:
+                    fixup_rows.append((amount_currency, line.id))
+        if not fixup_rows:
+            return
+        self.env.cr.execute_values(
+            """
+            UPDATE journal_entry_item line
+               SET amount_currency = source.amount_currency
+              FROM (VALUES %s) AS source(amount_currency, id)
+             WHERE line.id = source.id
+            """,
+            fixup_rows,
+            page_size=1000,
+        )
+        exchange_moves.line_ids.invalidate_recordset(
+            [
+                "amount_currency",
+                "price_subtotal",
+                "price_total",
+                "amount_residual",
+                "amount_residual_currency",
+                "reconciled",
+            ]
+        )
 
     @api.model
     def _create_exchange_difference_moves(self, exchange_diff_values_list):
@@ -2225,6 +2289,9 @@ Currency Exchange settings, then reconcile again
             self.env["journal_entry"]
             .with_context(no_exchange_difference=True)
             .create(exchange_move_values_list)
+        )
+        self._fixup_exchange_move_amount_currency(
+            exchange_moves, exchange_diff_values_list
         )
 
         to_post = self.env["journal_entry"]

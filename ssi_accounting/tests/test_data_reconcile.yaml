@@ -1162,6 +1162,20 @@ scenarios:
           name: "FC9"
           symbol: "F10"
           rounding: 0.01
+      - step: "Set FC9's rate to 0.5 as of the receivable entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.5
+          name: 2026-06-01
+      - step: "Set FC9's rate to 0.4 as of the receipt entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.4
+          name: 2026-06-02
       - step: "Configure the company's currency exchange settings"
         action: "write"
         target: "company"
@@ -1169,7 +1183,8 @@ scenarios:
           currency_exchange_journal_id: "REC: journal.id"
           income_currency_exchange_account_id: "REC: acc_gain.id"
           expense_currency_exchange_account_id: "REC: acc_loss.id"
-      - step: "Create and post the receivable entry: 1000 FCU10 recorded at rate 15000"
+      - step:
+          "Create and post the receivable entry: 1000 FC9 recorded at rate 0.5 (2000.0)"
         action: "create"
         model: "journal_entry"
         save_as: "entry1"
@@ -1182,18 +1197,18 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: 1000.0
-                balance: 15000000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
                 debit: 0.0
-                credit: 15000000.0
+                credit: 2000.0
       - step: "Post it"
         action: "call"
         target: "entry1"
         method: "action_post"
         as_user: "base.user_admin"
-      - step: "Create and post the receipt entry: 1000 FCU10 recorded at rate 15500"
+      - step:
+          "Create and post the receipt entry: 1000 FC9 recorded at rate 0.4 (2500.0)"
         action: "create"
         model: "journal_entry"
         save_as: "entry2"
@@ -1206,11 +1221,10 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: -1000.0
-                balance: -15500000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
-                debit: 15500000.0
+                debit: 2500.0
                 credit: 0.0
       - step: "Post it"
         action: "call"
@@ -1280,7 +1294,7 @@ scenarios:
         asserts:
           amount:
             type: "value"
-            expected: 15000000.0
+            expected: 2000.0
           exchange_move_id:
             type: "value"
             operator: "is_truthy"
@@ -1310,7 +1324,7 @@ scenarios:
           ]
         save_as: "gain_line"
         expect_count: 1
-      - step: "Assert the 500000 gain is credited (received more than recorded)"
+      - step: "Assert the 500 gain is credited (received more than recorded)"
         action: "assert"
         target: "gain_line"
         asserts:
@@ -1319,7 +1333,7 @@ scenarios:
             expected: 0.0
           credit:
             type: "value"
-            expected: 500000.0
+            expected: 500.0
       - step: "Exactly one reconcile_partial points back to the exchange move"
         action: "search"
         model: "reconcile_partial"
@@ -1355,7 +1369,7 @@ scenarios:
             expected: false
           amount_residual:
             type: "value"
-            expected: 15000000.0
+            expected: 2000.0
       - step: "Both receivable lines' residuals are restored (credit side)"
         action: "assert"
         target: "line2"
@@ -1366,7 +1380,7 @@ scenarios:
             expected: false
           amount_residual:
             type: "value"
-            expected: -15500000.0
+            expected: -2500.0
 
   - name: "Cross-currency reconciliation without an exchange journal is rejected"
     steps:
@@ -1447,6 +1461,24 @@ scenarios:
           name: "FC1"
           symbol: "F11"
           rounding: 0.01
+      - step: "Set FC rate to 0.5 as of the receivable entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.5
+          name: 2026-06-03
+      - step: "Set FC rate to 0.4 as of the receipt entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.4
+          name: 2026-06-04
       - step:
           "Configure the second company's gain/loss accounts, but not the exchange
           journal"
@@ -1470,12 +1502,11 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: 1000.0
-                balance: 15000000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
                 debit: 0.0
-                credit: 15000000.0
+                credit: 2000.0
       - step: "Post it"
         action: "call"
         target: "entry1"
@@ -1498,11 +1529,10 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: -1000.0
-                balance: -15500000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
-                debit: 15500000.0
+                debit: 2500.0
                 credit: 0.0
       - step: "Post it"
         action: "call"
@@ -1599,6 +1629,24 @@ scenarios:
           name: "FC2"
           symbol: "F12"
           rounding: 0.01
+      - step: "Set FC rate to 0.5 as of the receivable entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.5
+          name: 2026-06-05
+      - step: "Set FC rate to 0.4 as of the receipt entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.4
+          name: 2026-06-06
       - step:
           "Configure the second company's journal and gain account, but not the loss
           account"
@@ -1622,12 +1670,11 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: 1000.0
-                balance: 15000000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
                 debit: 0.0
-                credit: 15000000.0
+                credit: 2000.0
       - step: "Post it"
         action: "call"
         target: "entry1"
@@ -1650,11 +1697,10 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: -1000.0
-                balance: -15500000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
-                debit: 15500000.0
+                debit: 2500.0
                 credit: 0.0
       - step: "Post it"
         action: "call"
@@ -1751,6 +1797,24 @@ scenarios:
           name: "FC3"
           symbol: "F13"
           rounding: 0.01
+      - step: "Set FC rate to 0.5 as of the receivable entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.5
+          name: 2026-06-07
+      - step: "Set FC rate to 0.4 as of the receipt entry's date"
+        action: "create"
+        model: "res.currency.rate"
+        context:
+          allowed_company_ids: ["REC: company_cfg.id"]
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 0.4
+          name: 2026-06-08
       - step:
           "Configure the second company's journal and loss account, but not the gain
           account"
@@ -1774,12 +1838,11 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: 1000.0
-                balance: 15000000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
                 debit: 0.0
-                credit: 15000000.0
+                credit: 2000.0
       - step: "Post it"
         action: "call"
         target: "entry1"
@@ -1802,11 +1865,10 @@ scenarios:
               - account_id: "REC: acc_ar.id"
                 currency_id: "REC: fcu.id"
                 amount_currency: -1000.0
-                balance: -15500000.0
             - - 0
               - 0
               - account_id: "REC: acc_income.id"
-                debit: 15500000.0
+                debit: 2500.0
                 credit: 0.0
       - step: "Post it"
         action: "call"

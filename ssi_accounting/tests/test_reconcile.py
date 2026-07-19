@@ -60,6 +60,20 @@ class TestReconcile(YamlTransactionCase):
                 "expense_currency_exchange_account_id": acc_loss.id,
             }
         )
+        # 'balance' is deliberately never given alongside 'amount_currency'
+        # below -- see '_prepare_exchange_difference_move_vals''s own
+        # comment: 'amount_currency''s inverse unconditionally re-derives
+        # 'balance' from 'amount_currency'/'currency_rate', clobbering any
+        # 'balance' also given on the same create() vals. Configuring an
+        # explicit rate per date instead (the same technique
+        # 'test_data_journal_entry.yaml' already uses) lets 'balance' be
+        # correctly *derived*, deterministically, from 'amount_currency'.
+        self.env["res.currency.rate"].create(
+            {"currency_id": currency.id, "rate": 0.5, "name": "2026-06-09"}
+        )
+        self.env["res.currency.rate"].create(
+            {"currency_id": currency.id, "rate": 0.4, "name": "2026-06-10"}
+        )
 
         entry1 = self.env["journal_entry"].create(
             {
@@ -73,7 +87,6 @@ class TestReconcile(YamlTransactionCase):
                             "account_id": acc_ar.id,
                             "currency_id": currency.id,
                             "amount_currency": 1000.0,
-                            "balance": 15000000.0,
                         },
                     ),
                     (
@@ -82,7 +95,7 @@ class TestReconcile(YamlTransactionCase):
                         {
                             "account_id": acc_income.id,
                             "debit": 0.0,
-                            "credit": 15000000.0,
+                            "credit": 2000.0,
                         },
                     ),
                 ],
@@ -101,7 +114,6 @@ class TestReconcile(YamlTransactionCase):
                             "account_id": acc_ar.id,
                             "currency_id": currency.id,
                             "amount_currency": -1000.0,
-                            "balance": -15500000.0,
                         },
                     ),
                     (
@@ -109,7 +121,7 @@ class TestReconcile(YamlTransactionCase):
                         0,
                         {
                             "account_id": acc_income.id,
-                            "debit": 15500000.0,
+                            "debit": 2500.0,
                             "credit": 0.0,
                         },
                     ),
@@ -120,6 +132,8 @@ class TestReconcile(YamlTransactionCase):
 
         line1 = entry1.line_ids.filtered(lambda line: line.account_id == acc_ar)
         line2 = entry2.line_ids.filtered(lambda line: line.account_id == acc_ar)
+        self.assertAlmostEqual(line1.balance, 2000.0, places=2)
+        self.assertAlmostEqual(line2.balance, -2500.0, places=2)
         (line1 + line2).reconcile()
 
         self.assertAlmostEqual(line1.amount_residual, 0.0, places=2)
@@ -129,10 +143,10 @@ class TestReconcile(YamlTransactionCase):
             [("debit_move_id", "=", line1.id), ("credit_move_id", "=", line2.id)]
         )
         self.assertEqual(len(main_partial), 1)
-        self.assertAlmostEqual(main_partial.amount, 15000000.0, places=2)
+        self.assertAlmostEqual(main_partial.amount, 2000.0, places=2)
 
         gain_line = main_partial.exchange_move_id.line_ids.filtered(
             lambda item: item.account_id == acc_gain
         )
-        self.assertAlmostEqual(gain_line.credit, 500000.0, places=2)
+        self.assertAlmostEqual(gain_line.credit, 500.0, places=2)
         self.assertAlmostEqual(gain_line.debit, 0.0, places=2)
