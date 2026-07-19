@@ -125,6 +125,7 @@ class JournalEntry(models.Model):
     )
     company_currency_id = fields.Many2one(
         comodel_name="res.currency",
+        string="Company Currency",
         related="company_id.currency_id",
         help="Currency of the company this journal entry belongs to.",
     )
@@ -445,8 +446,21 @@ Solution: Adjust the lines' debit/credit so each entry balances to zero,
             )
         )
 
-    @api.constrains("line_ids", "line_ids.debit", "line_ids.credit")
+    @api.constrains("line_ids")
     def _check_balanced_constrains(self):
+        """Validate balance when lines are added/removed/reassigned.
+
+        ``@api.constrains`` does not accept dotted paths through a
+        relation (``"line_ids.debit"`` logs a warning and is ignored at
+        registry-build time) -- only bare field names of this model. So
+        this only reliably fires when ``line_ids`` itself is touched from
+        the header's side (e.g. every ``create()`` with inline lines).
+        ``journal_entry.item._check_balanced_constrains`` below covers
+        the complementary case of a line's own ``debit``/``credit`` being
+        written directly -- same split as
+        ``tax.repartition_line._check_repartition_line_factor``'s
+        docstring already explains for a different model.
+        """
         self._check_balanced({"records": self})
 
     @api.model_create_multi

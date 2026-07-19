@@ -107,6 +107,7 @@ class JournalEntryItem(models.Model):
     )
     company_currency_id = fields.Many2one(
         comodel_name="res.currency",
+        string="Company Currency",
         related="move_id.company_currency_id",
         store=True,
         help="Currency 'debit'/'credit'/'balance'/'cumulated_balance' are "
@@ -412,3 +413,21 @@ class JournalEntryItem(models.Model):
                 continue
             line.price_subtotal = line.amount_currency
             line.price_total = line.amount_currency
+
+    @api.constrains("debit", "credit")
+    def _check_balanced_constrains(self):
+        """Validate balance when a line's own debit/credit is written directly.
+
+        Complements ``journal_entry._check_balanced_constrains``: a
+        dotted constrain on the header (``"line_ids.debit"``) is not
+        valid Odoo syntax and would silently do nothing (see that
+        method's docstring) -- it does not fire when this line is
+        written on its own (e.g. ``line.write({'debit': ...})``), which
+        is exactly how inline list-view edits happen. Defining the
+        constrain here, triggered by this model's own fields, covers
+        that case -- same split as
+        ``tax.repartition_line._check_repartition_line_factor``'s
+        docstring already explains for a different model.
+        """
+        for move in self.move_id:
+            move._check_balanced({"records": move})
