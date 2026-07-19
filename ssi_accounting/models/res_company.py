@@ -91,6 +91,29 @@ class ResCompany(models.Model):
         "postponed to a later time, in accordance with its journal's "
         "sequence.",
     )
+    currency_exchange_journal_id = fields.Many2one(
+        string="Exchange Difference Journal",
+        comodel_name="account.journal",
+        domain="[('type', '=', 'general'), ('company_id', '=', id)]",
+        help="Journal used to post automatic currency exchange difference entries.",
+    )
+    income_currency_exchange_account_id = fields.Many2one(
+        string="Gain Exchange Rate Account",
+        comodel_name="account.account",
+        help="Account used to post the gain when reconciling entries "
+        "in different currencies.",
+    )
+    expense_currency_exchange_account_id = fields.Many2one(
+        string="Loss Exchange Rate Account",
+        comodel_name="account.account",
+        help="Account used to post the loss when reconciling entries "
+        "in different currencies.",
+    )
+    account_journal_suspense_account_id = fields.Many2one(
+        string="Journal Suspense Account",
+        comodel_name="account.account",
+        help="Default suspense account proposed on new journals of this company.",
+    )
 
     def _get_lock_date_violations(self, accounting_date, fiscalyear=True, tax=True):
         """Get the lock dates affecting ``accounting_date``.

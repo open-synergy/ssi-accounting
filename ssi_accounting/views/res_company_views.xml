@@ -19,6 +19,15 @@
                         <field name="fiscalyear_lock_date" />
                         <field name="tax_lock_date" />
                     </group>
+                    <group
+                        name="ssi_accounting_currency_exchange_group"
+                        string="Currency Exchange"
+                    >
+                        <field name="currency_exchange_journal_id" />
+                        <field name="income_currency_exchange_account_id" />
+                        <field name="expense_currency_exchange_account_id" />
+                        <field name="account_journal_suspense_account_id" />
+                    </group>
                 </page>
             </xpath>
         </field>
