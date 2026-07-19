@@ -22,11 +22,16 @@ class ReconcilePartial(models.Model):
     ``_get_to_update_payments`` (no ``account.payment`` concept exists
     anywhere in this repo).
 
-    **``exchange_move_id`` is kept but never populated by this unit** --
-    a plain, always-empty forward reference until a later currency unit
-    lands, the same pattern ``journal_entry.reversed_entry_id``'s sibling
-    fields and ``account.py``'s ``_toggle_reconcile_to_true`` already use
-    for fields/behaviour still out of scope.
+    **``exchange_move_id`` was kept but left unpopulated by a prior unit
+    (#12)** -- a forward reference, the same pattern
+    ``journal_entry.reversed_entry_id``'s sibling fields and
+    ``account.py``'s ``_toggle_reconcile_to_true`` used for fields/
+    behaviour still out of scope at the time. **This, later, dedicated
+    currency unit (#13) is the one that fills it in**, from
+    ``journal_entry.item._reconcile_plan_with_sync`` -- see that
+    field's own help text. The ``unlink()`` leg reversing/unlinking it
+    (kept verbatim below since it was already ported) now runs for real
+    instead of being a permanent no-op.
 
     **``create()``/``_update_matching_number()`` are ported apa adanya**
     (raw SQL bulk update included), and **``unlink()`` keeps its bug-fix
@@ -66,9 +71,12 @@ class ReconcilePartial(models.Model):
     exchange_move_id = fields.Many2one(
         comodel_name="journal_entry",
         index=True,
-        help="Technical field: the currency exchange difference entry "
-        "generated for this partial. Never populated by this unit -- see "
-        "the class docstring -- filled by a later, dedicated currency unit.",
+        help="The currency exchange difference entry generated for this "
+        "partial, if any -- set by "
+        "'journal_entry.item._reconcile_plan_with_sync' once "
+        "'journal_entry.item._create_exchange_difference_moves' "
+        "returns. Empty for a partial that matched without a "
+        "cross-currency residual to fix.",
     )
     company_currency_id = fields.Many2one(
         comodel_name="res.currency",

@@ -477,6 +477,15 @@ class JournalEntryItem(models.Model):
         "by 'reconcile_partial._update_matching_number' -- see its own "
         "docstring; this field has no 'compute=' of its own.",
     )
+    exchange_move_ids = fields.Many2many(
+        comodel_name="journal_entry",
+        compute="_compute_exchange_move_ids",
+        compute_sudo=True,
+        help="Currency exchange difference entries generated for this "
+        "line by 'reconcile_partial'/'journal_entry.item"
+        "._create_exchange_difference_moves' -- empty for a line never "
+        "reconciled across currencies.",
+    )
 
     _check_accountable_required_fields = models.Constraint(
         "CHECK(display_type IN ('line_section', 'line_note') "
@@ -721,6 +730,24 @@ class JournalEntryItem(models.Model):
                 line.matched_debit_ids.debit_move_id
                 + line.matched_credit_ids.credit_move_id
             ).filtered(accessible_lines.__contains__)
+
+    @api.depends(
+        "matched_debit_ids.exchange_move_id", "matched_credit_ids.exchange_move_id"
+    )
+    def _compute_exchange_move_ids(self):
+        """The exchange difference entries generated for this line's own partials.
+
+        Field penghubung per this issue's Keputusan Desain: mirrors
+        every non-empty 'exchange_move_id' of this line's
+        'matched_debit_ids'/'matched_credit_ids' -- set by
+        'journal_entry.item._reconcile_plan_with_sync' once
+        '_create_exchange_difference_moves' returns.
+        """
+        for line in self:
+            line.sudo().exchange_move_ids = (
+                line.matched_debit_ids.exchange_move_id
+                + line.matched_credit_ids.exchange_move_id
+            )
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -1020,7 +1047,7 @@ class JournalEntryItem(models.Model):
         min_recon_amount,
         exchange_line_mode,
     ):
-        """The '<amount, debit_amount_currency, credit_amount_currency>' triple.
+        """The '<amount, debit_amount_currency, credit_amount_currency, ...>' tuple.
 
         Split out of '_prepare_reconciliation_single_partial' purely to
         keep that method under this repo's mccabe complexity budget -- a
@@ -1029,10 +1056,19 @@ class JournalEntryItem(models.Model):
         "Computation of partial amounts" section of upstream
         ``AccountMoveLine._prepare_reconciliation_single_partial``,
         rounding-avoidance block included: it corrects the *matching
-        amount itself*, not an exchange-difference entry (unlike the
-        block this issue drops -- see the caller's docstring), so it
-        stays even though this issue's tests are restricted to
-        single-currency reconciliation.
+        amount itself*, not an exchange-difference entry, so it applies
+        regardless of currency.
+
+        Also returns the intermediate ``partial_debit_amount``/
+        ``partial_credit_amount`` (company-currency amounts each side
+        alone would allow, before the final ``min()``/rounding-avoidance
+        override) -- upstream's exchange-difference block reads those
+        two directly; see
+        '_prepare_reconciliation_single_partial_exchange_values_cross_currency'.
+        In the ``recon_currency == company_currency`` branch neither
+        concept exists (there is only ever one, shared, company-currency
+        partial amount), so both simply mirror 'partial_amount' there --
+        harmless, since that branch's caller never reads them.
         """
         remaining_debit_amount = debit_values["amount_residual"]
         remaining_credit_amount = credit_values["amount_residual"]
@@ -1079,6 +1115,8 @@ class JournalEntryItem(models.Model):
                 partial_amount,
                 partial_debit_amount_currency,
                 partial_credit_amount_currency,
+                partial_amount,
+                partial_amount,
             )
 
         # recon_currency != company_currency
@@ -1141,7 +1179,228 @@ class JournalEntryItem(models.Model):
             partial_amount,
             partial_debit_amount_currency,
             partial_credit_amount_currency,
+            partial_debit_amount,
+            partial_credit_amount,
         )
+
+    def _prepare_reconciliation_single_partial_exchange_values_same_currency(
+        self,
+        debit_values,
+        credit_values,
+        debit_currency,
+        credit_currency,
+        partial_debit_amount_currency,
+        partial_credit_amount_currency,
+        debit_fully_matched,
+        credit_fully_matched,
+    ):
+        """The 'recon_currency == company_currency' half of the exchange block.
+
+        Split out of
+        '_prepare_reconciliation_single_partial_exchange_values' purely
+        to keep it under this repo's mccabe complexity budget -- a
+        structural, not behavioural, deviation from a literal port (see
+        'item-format.md' §0/§6). Ported (behaviour-wise) from the first
+        branch of the "Computation of the partial exchange difference"
+        section of upstream
+        ``AccountMoveLine._prepare_reconciliation_single_partial``.
+        Mutates 'debit_values'/'credit_values' in place, see the
+        caller's own docstring.
+
+        :return: '(exchange_lines_to_fix, amounts_list)', both possibly
+            empty.
+        """
+        exchange_lines_to_fix = self.env["journal_entry.item"]
+        amounts_list = []
+        if debit_fully_matched:
+            debit_exchange_amount = (
+                debit_values["amount_residual_currency"] - partial_debit_amount_currency
+            )
+            if not debit_currency.is_zero(debit_exchange_amount):
+                exchange_lines_to_fix += debit_values["aml"]
+                amounts_list.append({"amount_residual_currency": debit_exchange_amount})
+                debit_values["amount_residual_currency"] -= debit_exchange_amount
+        if credit_fully_matched:
+            credit_exchange_amount = (
+                credit_values["amount_residual_currency"]
+                + partial_credit_amount_currency
+            )
+            if not credit_currency.is_zero(credit_exchange_amount):
+                exchange_lines_to_fix += credit_values["aml"]
+                amounts_list.append(
+                    {"amount_residual_currency": credit_exchange_amount}
+                )
+                credit_values["amount_residual_currency"] += credit_exchange_amount
+        return exchange_lines_to_fix, amounts_list
+
+    def _prepare_reconciliation_single_partial_exchange_values_cross_currency(
+        self,
+        debit_values,
+        credit_values,
+        company_currency,
+        debit_currency,
+        credit_currency,
+        partial_amount,
+        partial_debit_amount,
+        partial_credit_amount,
+        debit_fully_matched,
+        credit_fully_matched,
+    ):
+        """The 'recon_currency != company_currency' half of the exchange block.
+
+        Split out of
+        '_prepare_reconciliation_single_partial_exchange_values' purely
+        to keep it under this repo's mccabe complexity budget -- a
+        structural, not behavioural, deviation from a literal port (see
+        'item-format.md' §0/§6). Ported (behaviour-wise) from the second
+        branch of the "Computation of the partial exchange difference"
+        section of upstream
+        ``AccountMoveLine._prepare_reconciliation_single_partial``.
+        Mutates 'debit_values'/'credit_values' in place, see the
+        caller's own docstring.
+
+        :return: '(exchange_lines_to_fix, amounts_list)', both possibly
+            empty.
+        """
+        exchange_lines_to_fix = self.env["journal_entry.item"]
+        amounts_list = []
+        if debit_fully_matched:
+            debit_exchange_amount = debit_values["amount_residual"] - partial_amount
+            if not company_currency.is_zero(debit_exchange_amount):
+                exchange_lines_to_fix += debit_values["aml"]
+                amounts_list.append({"amount_residual": debit_exchange_amount})
+                debit_values["amount_residual"] -= debit_exchange_amount
+                if debit_currency == company_currency:
+                    debit_values["amount_residual_currency"] -= debit_exchange_amount
+        else:
+            debit_exchange_amount = partial_debit_amount - partial_amount
+            if company_currency.compare_amounts(debit_exchange_amount, 0.0) > 0:
+                exchange_lines_to_fix += debit_values["aml"]
+                amounts_list.append({"amount_residual": debit_exchange_amount})
+                debit_values["amount_residual"] -= debit_exchange_amount
+                if debit_currency == company_currency:
+                    debit_values["amount_residual_currency"] -= debit_exchange_amount
+
+        if credit_fully_matched:
+            credit_exchange_amount = credit_values["amount_residual"] + partial_amount
+            if not company_currency.is_zero(credit_exchange_amount):
+                exchange_lines_to_fix += credit_values["aml"]
+                amounts_list.append({"amount_residual": credit_exchange_amount})
+                credit_values["amount_residual"] -= credit_exchange_amount
+                if credit_currency == company_currency:
+                    credit_values["amount_residual_currency"] -= credit_exchange_amount
+        else:
+            credit_exchange_amount = partial_amount - partial_credit_amount
+            if company_currency.compare_amounts(credit_exchange_amount, 0.0) < 0:
+                exchange_lines_to_fix += credit_values["aml"]
+                amounts_list.append({"amount_residual": credit_exchange_amount})
+                credit_values["amount_residual"] -= credit_exchange_amount
+                if credit_currency == company_currency:
+                    credit_values["amount_residual_currency"] -= credit_exchange_amount
+        return exchange_lines_to_fix, amounts_list
+
+    def _prepare_reconciliation_single_partial_exchange_values(
+        self,
+        debit_values,
+        credit_values,
+        recon_currency,
+        company_currency,
+        debit_currency,
+        credit_currency,
+        partial_amount,
+        partial_debit_amount_currency,
+        partial_credit_amount_currency,
+        partial_debit_amount,
+        partial_credit_amount,
+        debit_fully_matched,
+        credit_fully_matched,
+        shadowed_aml_values=None,
+    ):
+        """Compute (and apply) the exchange-difference adjustment of one partial.
+
+        Restores the block '_prepare_reconciliation_single_partial'
+        dropped when this repo's reconciliation unit (#12) landed --
+        see that method's own docstring: selisih kurs entry generation
+        is this unit's (#13) job. Ported (behaviour-wise) from the
+        "Computation of the partial exchange difference" section of
+        upstream ``AccountMoveLine._prepare_reconciliation_single_partial``,
+        split into the two ``_..._same_currency``/``_..._cross_currency``
+        helpers above purely to keep every individual method under this
+        repo's mccabe complexity budget (see 'item-format.md' §0/§6) --
+        a structural, not behavioural, deviation from upstream's own
+        single, longer branch.
+
+        Skipped entirely via the 'no_exchange_difference'/
+        'no_exchange_difference_no_recursive' context keys, exactly like
+        upstream -- set by '_create_exchange_difference_moves' while
+        reconciling an exchange move's own line against the original
+        one, so that second reconciliation does not recurse into
+        generating a further exchange difference.
+
+        Mutates 'debit_values'/'credit_values' in place -- whatever
+        amount this exchange difference absorbs is subtracted from them
+        here, exactly like the caller already does for the partial
+        amount itself right after calling this method.
+
+        :return: the 'exchange_values' dict for
+            '_create_exchange_difference_moves' (see
+            '_prepare_exchange_difference_move_vals'), or 'None' if no
+            exchange difference is needed for this partial.
+        """
+        if self.env.context.get("no_exchange_difference") or self.env.context.get(
+            "no_exchange_difference_no_recursive"
+        ):
+            return None
+
+        if recon_currency == company_currency:
+            exchange_lines_to_fix, amounts_list = (
+                self._prepare_reconciliation_single_partial_exchange_values_same_currency(
+                    debit_values,
+                    credit_values,
+                    debit_currency,
+                    credit_currency,
+                    partial_debit_amount_currency,
+                    partial_credit_amount_currency,
+                    debit_fully_matched,
+                    credit_fully_matched,
+                )
+            )
+        else:
+            exchange_lines_to_fix, amounts_list = (
+                self._prepare_reconciliation_single_partial_exchange_values_cross_currency(
+                    debit_values,
+                    credit_values,
+                    company_currency,
+                    debit_currency,
+                    credit_currency,
+                    partial_amount,
+                    partial_debit_amount,
+                    partial_credit_amount,
+                    debit_fully_matched,
+                    credit_fully_matched,
+                )
+            )
+
+        if not exchange_lines_to_fix:
+            return None
+
+        debit_aml = debit_values["aml"]
+        credit_aml = credit_values["aml"]
+        exchange_values = exchange_lines_to_fix._prepare_exchange_difference_move_vals(
+            amounts_list,
+            exchange_date=max(
+                debit_aml._get_reconciliation_aml_field_value(
+                    "date", shadowed_aml_values
+                ),
+                credit_aml._get_reconciliation_aml_field_value(
+                    "date", shadowed_aml_values
+                ),
+            ),
+        )
+        exchange_values["to_post"] = (
+            debit_aml.parent_state == "posted" and credit_aml.parent_state == "posted"
+        )
+        return exchange_values
 
     @api.model
     def _prepare_reconciliation_single_partial(
@@ -1150,16 +1409,14 @@ class JournalEntryItem(models.Model):
         """Compute one 'reconcile_partial''s worth of matching between two lines.
 
         Ported (behaviour-wise) from upstream
-        ``AccountMoveLine._prepare_reconciliation_single_partial``,
-        **trimmed of the whole exchange-difference-vals block**
-        (``res['exchange_values']`` and everything computing it) --
-        selisih kurs entry generation is out of this issue's scope, a
-        later, dedicated currency unit's job (see the class docstring
-        and this issue's Keputusan Desain: 'exchange_move_id' stays
-        unpopulated by this unit). The currency/rate selection that
-        block also needs for the *matching amount itself*
-        ('exchange_line_mode' and the partial-amount computation) is
-        kept -- see '_prepare_reconciliation_single_partial_amounts'.
+        ``AccountMoveLine._prepare_reconciliation_single_partial``. A
+        prior unit (#12) trimmed the whole exchange-difference-vals
+        block (``res['exchange_values']`` and everything computing it),
+        deferring selisih kurs entry generation to this, later,
+        dedicated currency unit -- restored below via
+        '_prepare_reconciliation_single_partial_exchange_values', split
+        out to keep this method under this repo's mccabe complexity
+        budget (see 'item-format.md' §0/§6).
         """
         res = {"debit_values": debit_values, "credit_values": credit_values}
         debit_aml = debit_values["aml"]
@@ -1214,6 +1471,14 @@ class JournalEntryItem(models.Model):
         recon_credit_amount = -credit_recon_values["residual"]
         min_recon_amount = min(recon_debit_amount, recon_credit_amount)
 
+        # Which line is fully matched by the other -- read by the
+        # exchange-difference block below, see its own docstring.
+        compare_amounts = recon_currency.compare_amounts(
+            recon_debit_amount, recon_credit_amount
+        )
+        debit_fully_matched = compare_amounts <= 0
+        credit_fully_matched = compare_amounts >= 0
+
         exchange_line_mode = (
             recon_currency == company_currency
             and debit_currency == credit_currency
@@ -1227,6 +1492,8 @@ class JournalEntryItem(models.Model):
             partial_amount,
             partial_debit_amount_currency,
             partial_credit_amount_currency,
+            partial_debit_amount,
+            partial_credit_amount,
         ) = self._prepare_reconciliation_single_partial_amounts(
             recon_currency,
             company_currency,
@@ -1239,6 +1506,25 @@ class JournalEntryItem(models.Model):
             min_recon_amount,
             exchange_line_mode,
         )
+
+        exchange_values = self._prepare_reconciliation_single_partial_exchange_values(
+            debit_values,
+            credit_values,
+            recon_currency,
+            company_currency,
+            debit_currency,
+            credit_currency,
+            partial_amount,
+            partial_debit_amount_currency,
+            partial_credit_amount_currency,
+            partial_debit_amount,
+            partial_credit_amount,
+            debit_fully_matched,
+            credit_fully_matched,
+            shadowed_aml_values=shadowed_aml_values,
+        )
+        if exchange_values:
+            res["exchange_values"] = exchange_values
 
         res["partial_values"] = {
             "amount": partial_amount,
@@ -1583,9 +1869,13 @@ Solution: Enable "Allow Reconciliation" on the account first
         §0/§6). Ported (behaviour-wise) from the "Prepare full reconcile
         creation" section of upstream
         ``AccountMoveLine._reconcile_plan_with_sync``, trimmed of its
-        'has_multiple_currencies' branch on residual-zero checks -- this
-        issue's tests are restricted to single-currency reconciliation
-        (see the class docstring), so upstream's own plain
+        'has_multiple_currencies' branch on residual-zero checks: a
+        graph spanning more than one non-company currency is still out
+        of this issue's scope (see the class docstring) -- an exchange
+        move's own lines are stamped with the *same* currency as the
+        line they fix (see '_prepare_exchange_difference_move_vals'), so
+        even a cross-currency reconciliation graph never grows past one
+        non-company currency here. Upstream's own plain
         'amount_residual_currency' check (its 'else' branch) is kept as
         the sole rule.
         """
@@ -1631,6 +1921,21 @@ Solution: Enable "Allow Reconciliation" on the account first
             if not full_batch["is_fully_reconciled"]:
                 continue
             amls = full_batch["amls"]
+            if amls and all(aml.full_reconcile_id for aml in amls):
+                # Already grouped into a 'reconcile_full' by a *nested*
+                # '_reconcile_plan' call that finished earlier in this
+                # same call stack -- '_create_exchange_difference_moves'
+                # (called by '_reconcile_plan_with_sync' below, before
+                # this method runs) explicitly reconciles an exchange
+                # move's line against the original one it fixes, and
+                # that nested reconciliation's own full-reconcile step
+                # already sees the *whole* graph (original debit/credit
+                # lines and the exchange line all share one
+                # 'matching_number' the moment the exchange partial is
+                # created -- see 'reconcile_partial._update_matching_number').
+                # Skip here, or this same, now-fully-matched graph would
+                # get a second, duplicate 'reconcile_full'.
+                continue
             involved_partials = amls.matched_debit_ids + amls.matched_credit_ids
             full_reconcile_values_list.append(
                 {
@@ -1649,15 +1954,28 @@ Solution: Enable "Allow Reconciliation" on the account first
         Ported (behaviour-wise) from upstream
         ``AccountMoveLine._reconcile_plan_with_sync``, trimmed of
         everything this issue's Keputusan Desain drops: the invoice-paid
-        pre/post hooks (``_reconcile_pre_hook``/``_reconcile_post_hook``),
-        the whole exchange-difference-move creation stage (partials never
-        carry ``exchange_values`` any more -- see
-        ``_prepare_reconciliation_single_partial``), and the tax-cash-
-        basis stage (no ``tax_exigibility``/cash-basis concept exists
-        anywhere in this repo). Also drops upstream's bare-attribute-access
-        cache-warmup prefetch of 'move_id'/'matched_debit_ids'/
-        'matched_credit_ids' -- see '_reconcile_plan_create_full_reconciles'
-        for why.
+        pre/post hooks (``_reconcile_pre_hook``/``_reconcile_post_hook``)
+        and the tax-cash-basis stage (no ``tax_exigibility``/cash-basis
+        concept exists anywhere in this repo). Also drops upstream's
+        bare-attribute-access cache-warmup prefetch of 'move_id'/
+        'matched_debit_ids'/'matched_credit_ids' -- see
+        '_reconcile_plan_create_full_reconciles' for why.
+
+        **The exchange-difference-move creation stage is restored here**
+        (a prior unit, #12, dropped it -- see
+        '_prepare_reconciliation_single_partial'\'s own docstring): every
+        'exchange_values' a partial's computation produced is collected
+        and handed to '_create_exchange_difference_moves' once every
+        partial of this call has been created, then each exchange move
+        is linked back onto the partial that produced it via
+        'exchange_move_id' -- by *index*, not upstream's own
+        'reconciled_lines_ids'-based heuristic (see that field's
+        docstring on 'journal_entry.item': this repo dropped its
+        inverse, and unlike upstream's batched heuristic this call
+        already knows the exact 1:1 order between
+        'exchange_diff_values_list' and the partial each entry came
+        from, since '_create_exchange_difference_moves' both creates and
+        reconciles those moves in that same order).
         """
         aml_values_map = {
             aml: {
@@ -1669,12 +1987,18 @@ Solution: Enable "Allow Reconciliation" on the account first
         }
 
         partials_values_list = []
+        exchange_diff_values_list = []
+        exchange_diff_partial_indexes = []
         all_plan_results = []
         for plan in plan_list:
             plan_results = self._prepare_reconciliation_plan(plan, aml_values_map)
             all_plan_results.append(plan_results)
             for results in plan_results:
                 partials_values_list.append(results["partial_values"])
+                exchange_values = results.get("exchange_values")
+                if exchange_values and exchange_values["move_values"]["line_ids"]:
+                    exchange_diff_values_list.append(exchange_values)
+                    exchange_diff_partial_indexes.append(len(partials_values_list) - 1)
 
         partials = self.env["reconcile_partial"].create(partials_values_list)
         start_range = 0
@@ -1683,7 +2007,241 @@ Solution: Enable "Allow Reconciliation" on the account first
             plan["partials"] = partials[start_range : start_range + size]
             start_range += size
 
+        exchange_moves = self._create_exchange_difference_moves(
+            exchange_diff_values_list
+        )
+        for partial_index, exchange_move in zip(
+            exchange_diff_partial_indexes, exchange_moves, strict=False
+        ):
+            partials[partial_index].exchange_move_id = exchange_move.id
+
         self._reconcile_plan_create_full_reconciles(plan_list, aml_values_map, all_amls)
+
+    def _get_exchange_journal(self, company):
+        """The journal an exchange difference entry for 'company' posts to.
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``AccountMoveLine._get_exchange_journal``. Always a 'general'
+        journal -- enforced by 'currency_exchange_journal_id''s own
+        domain, see 'res_company.py'.
+        """
+        return company.currency_exchange_journal_id
+
+    def _get_exchange_account(self, company, amount):
+        """The gain/loss account an exchange difference amount posts to.
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``AccountMoveLine._get_exchange_account``: a positive 'amount'
+        (this line needs *more* debited to close its residual) is a
+        loss, a negative one a gain.
+        """
+        if amount > 0.0:
+            return company.expense_currency_exchange_account_id
+        return company.income_currency_exchange_account_id
+
+    def _prepare_exchange_difference_move_vals(
+        self, amounts_list, company=None, exchange_date=None, **kwargs
+    ):
+        """Build create() vals for the exchange difference entry fixing 'self'.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._prepare_exchange_difference_move_vals``, with
+        two adaptations forced by this repo's own trimmed models (per
+        this issue's Keputusan Desain):
+
+        - **Company determination is simplified.** Upstream filters
+          'self.move_id' on 'is_invoice(True)' first -- that method does
+          not resolve on 'journal_entry' any more (see its class
+          docstring: the shims were removed once the tax synchronisation
+          unit landed), so company is read straight off
+          'move_id.company_id'.
+        - **The exchange journal's accounting-date lookup is dropped**
+          along with the field itself: 'account.journal.accounting_date'
+          does not exist here (see 'journal.py''s class docstring, which
+          lists it among upstream fields this repo has no sale/purchase/
+          bank/cash journal type to justify). Lock-date postponement
+          already happens uniformly at posting time, via
+          'journal_entry._post()' -- see '_create_exchange_difference_moves'
+          -- so 'exchange_date' (or, failing that, today) is used as
+          this entry's initial date as-is.
+
+        :param amounts_list: one dict per line of 'self', each either
+            '{"amount_residual": ...}' or '{"amount_residual_currency": ...}'
+            -- see the two '_prepare_reconciliation_single_partial_exchange_values_*'
+            callers.
+        :param company: fallback company, used only if 'self' is empty.
+        :param exchange_date: date to stamp the entry with.
+        :return: a dict with keys 'move_values' (create() vals) and
+            'to_reconcile' (a list of '(line, sequence)' tuples).
+        """
+        company = (self.move_id.company_id or company)[:1]
+        if not company:
+            return None
+
+        journal = self._get_exchange_journal(company)
+        move_vals = {
+            "date": exchange_date or fields.Date.context_today(self),
+            "journal_id": journal.id,
+            "line_ids": [],
+        }
+        to_reconcile = []
+        for line, amounts in zip(self, amounts_list, strict=False):
+            move_vals["date"] = max(move_vals["date"], line.date)
+
+            if "amount_residual" in amounts:
+                amount_residual = amounts["amount_residual"]
+                amount_residual_currency = 0.0
+                if line.currency_id == line.company_currency_id:
+                    amount_residual_currency = amount_residual
+                amount_residual_to_fix = amount_residual
+                if line.company_currency_id.is_zero(amount_residual):
+                    continue
+            elif "amount_residual_currency" in amounts:
+                amount_residual = 0.0
+                amount_residual_currency = amounts["amount_residual_currency"]
+                amount_residual_to_fix = amount_residual_currency
+                if line.currency_id.is_zero(amount_residual_currency):
+                    continue
+            else:
+                continue
+
+            exchange_line_account = self._get_exchange_account(
+                company, amount_residual_to_fix
+            )
+            sequence = len(move_vals["line_ids"])
+            line_vals = [
+                {
+                    "name": self.env._("Currency exchange rate difference"),
+                    "debit": -amount_residual if amount_residual < 0.0 else 0.0,
+                    "credit": amount_residual if amount_residual > 0.0 else 0.0,
+                    "amount_currency": -amount_residual_currency,
+                    "full_reconcile_id": line.full_reconcile_id.id,
+                    "account_id": line.account_id.id,
+                    "currency_id": line.currency_id.id,
+                    "partner_id": line.partner_id.id,
+                    "sequence": sequence,
+                },
+                {
+                    "name": self.env._("Currency exchange rate difference"),
+                    "debit": amount_residual if amount_residual > 0.0 else 0.0,
+                    "credit": -amount_residual if amount_residual < 0.0 else 0.0,
+                    "amount_currency": amount_residual_currency,
+                    "account_id": exchange_line_account.id,
+                    "currency_id": line.currency_id.id,
+                    "partner_id": line.partner_id.id,
+                    "sequence": sequence + 1,
+                },
+            ]
+            move_vals["line_ids"] += [Command.create(vals) for vals in line_vals]
+            to_reconcile.append((line, sequence))
+
+        return {"move_values": move_vals, "to_reconcile": to_reconcile}
+
+    @api.model
+    def _create_exchange_difference_moves(self, exchange_diff_values_list):
+        """Create, post and reconcile every exchange difference entry queued up.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._create_exchange_difference_moves``, with one
+        structural adaptation forced by this repo's own trimmed model:
+        upstream reconciles each entry's line against the original one
+        it fixes by setting 'reconciled_lines_ids' in 'move_vals' and
+        relying on that field's inverse -- 'journal_entry.item' dropped
+        that inverse (see 'reconciled_lines_ids''s own field docstring:
+        this repo's UI wave drives reconciliation through
+        'action_reconcile' instead), so this method reconciles each
+        '(line, sequence)' pair from 'to_reconcile' explicitly instead,
+        via a plain 'reconcile()' call guarded with
+        'no_exchange_difference=True' so it does not recurse into
+        generating a further exchange difference of its own.
+
+        **This is also where this issue's "posting cascade" resolves**
+        (see 'journal_entry.py''s class docstring, which used to flag it
+        as stubbed): every newly created exchange move whose originating
+        lines were both already posted ('to_post', see
+        '_prepare_reconciliation_single_partial_exchange_values') is
+        posted here, immediately, before being reconciled.
+
+        :param exchange_diff_values_list: list of
+            '_prepare_exchange_difference_move_vals'\' return values.
+        :return: the created 'journal_entry' records, in the same order
+            as 'exchange_diff_values_list'.
+        """
+        if not exchange_diff_values_list:
+            return self.env["journal_entry"]
+
+        exchange_move_values_list = []
+        journals = self.env["account.journal"]
+        for exchange_diff_values in exchange_diff_values_list:
+            move_vals = exchange_diff_values["move_values"]
+            exchange_move_values_list.append(move_vals)
+            if not move_vals["journal_id"]:
+                raise UserError(
+                    self.env._(
+                        """
+Context: Reconcile journal items in different currencies
+Problem: No exchange difference journal is configured for this company
+Solution: Set the "Exchange Difference Journal" in the company's \
+Currency Exchange settings, then reconcile again
+"""
+                    )
+                )
+            journals |= self.env["account.journal"].browse(move_vals["journal_id"])
+
+        for journal in journals:
+            company = journal.company_id
+            if not company.expense_currency_exchange_account_id:
+                raise UserError(
+                    self.env._(
+                        """
+Context: Reconcile journal items in different currencies
+Problem: No loss exchange rate account is configured for this company
+Solution: Set the "Loss Exchange Rate Account" in the company's \
+Currency Exchange settings, then reconcile again
+"""
+                    )
+                )
+            if not company.income_currency_exchange_account_id:
+                raise UserError(
+                    self.env._(
+                        """
+Context: Reconcile journal items in different currencies
+Problem: No gain exchange rate account is configured for this company
+Solution: Set the "Gain Exchange Rate Account" in the company's \
+Currency Exchange settings, then reconcile again
+"""
+                    )
+                )
+
+        exchange_moves = (
+            self.env["journal_entry"]
+            .with_context(no_exchange_difference=True)
+            .create(exchange_move_values_list)
+        )
+
+        to_post = self.env["journal_entry"]
+        for exchange_move, exchange_diff_values in zip(
+            exchange_moves, exchange_diff_values_list, strict=False
+        ):
+            if exchange_diff_values["to_post"]:
+                to_post |= exchange_move
+        if to_post:
+            to_post._post()
+
+        for exchange_move, exchange_diff_values in zip(
+            exchange_moves, exchange_diff_values_list, strict=False
+        ):
+            if exchange_move.state != "posted":
+                continue
+            for line, sequence in exchange_diff_values["to_reconcile"]:
+                exchange_line = exchange_move.line_ids.filtered(
+                    lambda item, sequence=sequence: item.sequence == sequence
+                )
+                (line + exchange_line).with_context(
+                    no_exchange_difference=True
+                ).reconcile()
+
+        return exchange_moves
 
     def reconcile(self):
         """Reconcile 'self' (every line in it) all together."""
