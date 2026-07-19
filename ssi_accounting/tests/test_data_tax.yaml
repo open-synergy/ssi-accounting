@@ -317,34 +317,23 @@ scenarios:
         save_as: "group"
         values:
           name: "Bad Factor Group"
-      - step: "Create the tax"
+      - step: "Creating a tax with a base tax-line factor that isn't 100 is rejected"
         action: "create"
         model: "tax"
-        save_as: "tax_bad_factor"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "100"
         values:
           name: "Bad Factor Tax"
           amount_type: "percent"
           amount: 5.0
           tax_group_id: "REC: group.id"
-      - step: "Find the auto-generated base tax-type repartition line"
-        action: "search"
-        model: "tax.repartition_line"
-        domain:
-          [
-            ["tax_id", "=", "REC: tax_bad_factor.id"],
-            ["document_type", "=", "base"],
-            ["repartition_type", "=", "tax"],
-          ]
-        save_as: "base_tax_line"
-        expect_count: 1
-      - step: "Changing its factor away from 100 is rejected"
-        action: "write"
-        target: "base_tax_line"
-        expect_error:
-          type: "ValidationError"
-          message_contains: "100"
-        values:
-          factor_percent: 40.0
+          repartition_line_base_ids:
+            - - 0
+              - 0
+              - repartition_type: "tax"
+                document_type: "base"
+                factor_percent: 40
 
   - name: "Repartition line account from a different company is rejected"
     steps:
