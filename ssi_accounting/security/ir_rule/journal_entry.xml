@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Global multi-company isolation: journal_entry.company_id is
+         a stored related field (from journal_id.company_id), so a plain
+         company_id-in-allowed-companies domain is enough. No `groups`
+         field on purpose -> applies to every user, same as
+         `account_journal_multi_company_rule`. -->
+    <record id="journal_entry_multi_company_rule" model="ir.rule">
+        <field name="name">Journal Entry - Multi Company</field>
+        <field name="model_id" ref="model_journal_entry" />
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <!-- journal_entry.item is exposed through its own "Journal Items"
+         menu (not only as a child of journal_entry's form), so it also
+         needs its own multi-company isolation, unlike a pure child model
+         (e.g. tax.repartition_line) that only gets one via its parent. -->
+    <record id="journal_entry_item_multi_company_rule" model="ir.rule">
+        <field name="name">Journal Item - Multi Company</field>
+        <field name="model_id" ref="model_journal_entry_item" />
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>

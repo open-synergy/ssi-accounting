@@ -16,9 +16,11 @@ chart-of-accounts support models (``account.root``, ``account.group``,
 deactivation guard on ``res.currency``, and the chart of accounts itself:
 ``account.account`` (Odoo 19 style multi-company, with a Chart of Accounts menu)
 and its companion ``account.code.mapping``. It also has ``account.journal``/
-``account.journal.group``, and the tax configuration models ``tax_group``,
-``tax`` and its child ``tax.repartition_line``. Journal entries and the tax
-computation engine are added incrementally by later units.
+``account.journal.group``, the tax configuration models ``tax_group``,
+``tax`` and its child ``tax.repartition_line`` (plus their standalone
+computation engine), and the journal entry itself: ``journal_entry`` and its
+child ``journal_entry.item``. Posting, numbering, reconciliation, and wiring
+the tax engine to real journal items are added incrementally by later units.
 
 
 Design decisions
@@ -77,14 +79,83 @@ Design decisions
   self._fields`` for that reason. ``related_taxes_amount``/
   ``action_open_related_taxes`` only needed the ``tax`` model itself (not
   ``tax_ids``) and now work for real, now that ``tax`` exists.
-* Several ``account.account`` constraints/computes are guarded no-ops until later
-  units land, exactly like ``account.group``/``res.currency`` above: ``used``,
-  ``current_balance``, the reconcile-toggle guards, and the delete guard on
-  ``account.move.line`` (journal items — lands with ``journal_entry``); the
-  journal/account currency-mismatch check on ``account.journal`` (lands with
-  ``journal``). The delete guard on ``tax.repartition_line`` now works for real,
-  now that model exists (see below). Dropped entirely (out of this issue's
-  scope): the opening balance
+* ``journal_entry`` and its child ``journal_entry.item`` are ported (behaviour-wise)
+  from Odoo core's ``account.move``/``account.move.line``, because those models
+  live inside the ``account`` module, which ``ssi_accounting`` must not depend
+  on. Renamed to ``journal_entry``/``journal_entry.item`` per this unit's
+  Keputusan Desain (unlike ``account.journal``/``account.account``, they are
+  free to follow the plain-underscore SSI naming convention: nothing in this
+  module hardcodes the dotted placeholder name they used to be forward-referenced
+  by). This unit only covers ``draft``: posting, automatic numbering, the state
+  machine, tax line synchronisation, reconciliation, and exchange-rate
+  differences are all separate, later units.
+* ``amount_total_debit``/``amount_total_credit`` are ``journal_entry``'s only
+  aggregate fields -- the whole invoice-flavoured amount block
+  (``amount_untaxed``/``amount_tax``/``amount_total``/``amount_residual`` and
+  their ``*_signed`` variants, ``tax_totals``, ``payment_state``, ...) is
+  dropped, along with ``auto_post``/recurring entries, the hash chain, and
+  every field prefixed ``invoice_``/``statement_``/``payment_``. ``move_type``
+  is dropped too; ``is_entry()``/``is_invoice()`` are kept as shims (returning
+  ``True``/``False``) only so ported code compiles, and **must be deleted**
+  once the tax synchronisation unit lands.
+* ``journal_entry.item`` keeps ``product_id``/``quantity``/``price_unit``/
+  ``price_subtotal`` (a deliberate product decision), but purely as
+  informational fields: the tax base for an ``entry``-typed line is
+  ``amount_currency``, never ``quantity * price_unit`` -- exactly upstream
+  Odoo 19's own behaviour for ``account.move`` lines of ``move_type ==
+  'entry'``. ``product_uom_id`` is dropped (safe: ``tax``'s base-line builder
+  already falls back to ``uom.uom`` when it is absent). ``display_type``
+  stays required, shrunk to ``product``/``tax``/``line_section``/``line_note``
+  -- it is the base line vs. tax line discriminator the tax engine relies on.
+* ``account_id`` is deliberately **not** ``required=True``. Exactly upstream
+  ``account.move.line``'s own mechanism, its necessity is enforced by two
+  ``models.Constraint`` SQL ``CHECK``\ s ported verbatim (table name aside):
+  ``_check_accountable_required_fields`` (an account is required for
+  ``product``/``tax`` rows, optional for ``line_section``/``line_note``) and
+  ``_check_non_accountable_fields_null`` (``line_section``/``line_note`` rows
+  must carry no account and no ``debit``/``credit``/``amount_currency``). A
+  plain ``required=True`` on the field would have wrongly forced every
+  cosmetic section/note row to carry an account too.
+* ``debit``/``credit``/``balance``/``amount_currency`` stay consistent
+  whichever of the three is filled first. Unlike a first attempt at this
+  unit (which made ``balance`` a compute+inverse pair *over*
+  ``debit``/``credit``, with ``amount_currency`` inverse writing into
+  ``balance``), the field actually kept as the primary, directly writable
+  one is ``balance`` -- mirroring upstream ``account.move.line`` exactly:
+  ``debit``/``credit`` are a compute+inverse pair depending on ``balance``,
+  and ``amount_currency`` is a compute+inverse pair also depending on
+  ``balance``. An inverse method assigning into another field that itself
+  only has an ``inverse`` (not a plain ``@api.depends`` compute) does not
+  reliably cascade during ``create()``: filling only ``amount_currency`` on
+  a new line left ``debit``/``credit`` at their stale default under the
+  first attempt, silently producing an unbalanced entry (caught by CI, not
+  by this issue's own SQL-``CHECK`` review). Depending on ``balance`` via
+  ``@api.depends`` instead of a second inverse hop is what makes every fill
+  direction cascade correctly, exactly like upstream.
+* ``_check_balanced``/``_get_unbalanced_moves`` are ported verbatim from
+  upstream, raw SQL included (only the table names changed). Unbalanced
+  entries are rejected with an SSI-formatted error unless the journal has a
+  ``suspense_account_id``, in which case ``_sync_dynamic_lines``/
+  ``_sync_unbalanced_lines`` (a framework scaffold, not a verbatim port --
+  its stack is trimmed to this single auto-balancing stage) adds/adjusts a
+  line against that account instead.
+* Several ``account.account``/``account.journal``/``tax``/``res.currency``
+  guards that used to be written against the placeholder model names
+  ``account.move``/``account.move.line`` (before this unit's Keputusan
+  Desain settled on ``journal_entry``/``journal_entry.item``) now work for
+  real: ``account.account``'s ``used``, ``current_balance``, and the delete
+  guard; ``account.journal``'s ``entry_count``,
+  ``action_open_journal_entries``, the company-consistency check, and the
+  delete guard; ``tax``'s ``is_used``; ``res.currency``'s
+  ``_has_accounting_entries``. **Two guards stay no-ops on purpose**,
+  because reconciliation is still out of scope:
+  ``account.account._toggle_reconcile_to_true``/``_toggle_reconcile_to_false``
+  are guarded on ``"reconciled" not in self.env["journal_entry.item"]._fields``
+  (field-precision, not just model-presence -- the same pattern
+  ``_onchange_account_type`` already uses for ``tax_ids``), and will start
+  working once a later reconciliation unit adds that field. The delete guard
+  on ``tax.repartition_line`` continues to work for real, unaffected by this
+  unit. Dropped entirely (out of this issue's scope): the opening balance
   triplet, ``non_trade``, the partner-frequency heuristics behind the invoice line
   account widget, ``name_create``, ``get_import_templates``, and the whole
   merge/unmerge suite.
@@ -97,14 +168,13 @@ Design decisions
   are intentionally reduced to these two (of upstream's five) — ``sale_lock_date``,
   ``purchase_lock_date`` and ``hard_lock_date`` are dropped because this repo has no
   sale/purchase documents and no hard-lock requirement (yet). Exchange difference
-  fields are deliberately **not** added here — they will follow once ``journal``
-  exists.
+  fields are deliberately **not** added here — they belong to a future
+  reconciliation unit, out of scope for both this and the journal entry unit.
 * ``res.currency`` is inherited only to add ``_has_accounting_entries()`` and a
   ``write()`` guard that refuses to deactivate a currency already used on journal
   items. Unlike upstream (which guards a rounding-precision decrease), this guard
-  specifically blocks **deactivation**. It reads ``account.move.line``, which does
-  not exist yet in this repo's scope, so the guard is a no-op (deactivation always
-  succeeds) until that model is added alongside ``journal``.
+  specifically blocks **deactivation**. It reads ``journal_entry.item``, which
+  now exists (see below), so this guard works for real.
 * ``tax_group``, ``tax`` and its child ``tax.repartition_line`` are ported
   (behaviour-wise) from Odoo core's ``account.tax.group``/``account.tax``/
   ``account.tax.repartition.line``, because those models live inside the

@@ -41,10 +41,10 @@ class Tax(models.Model):
     ``_round_base_lines_tax_details``/``_prepare_tax_lines`` methods are
     ported (behaviour-wise) from the same upstream file, operating on
     plain ``dict`` "base lines" so the computation can be unit tested
-    without any ``account.move``/``account.move.line`` state -- that
-    state does not exist in this repo yet, and wiring the engine to real
-    journal entries/items is a separate unit ("unit sinkronisasi pajak"),
-    kept out of this issue's scope on purpose.
+    without any ``journal_entry``/``journal_entry.item`` state. Wiring
+    the engine to real journal entries/items is a separate unit ("unit
+    sinkronisasi pajak"), kept out of this issue's scope on purpose even
+    though those models now exist.
 
     **Simplifications the engine makes relative to upstream**, all a
     direct consequence of concepts already dropped from this model (see
@@ -276,17 +276,17 @@ class Tax(models.Model):
     def _compute_is_used(self):
         """Whether this tax is already used on a journal item.
 
-        Guarded on ``account.move.line``, which does not exist yet in
-        this repo -- always ``False`` until that model lands, exactly
-        like the other forward references guarded in ``account.py``/
-        ``journal.py``.
+        Reads ``journal_entry.item.tax_ids`` (originally written against
+        the placeholder name ``account.move.line`` before the journal
+        entry unit settled on ``journal_entry.item``), which now exists,
+        so this works for real -- guard kept for install-order safety.
         """
-        if "account.move.line" not in self.env:
+        if "journal_entry.item" not in self.env:
             self.is_used = False
             return
         for tax in self:
             tax.is_used = bool(
-                self.env["account.move.line"].search_count(
+                self.env["journal_entry.item"].search_count(
                     [("tax_ids", "in", tax.ids)], limit=1
                 )
             )
