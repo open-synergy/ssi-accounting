@@ -332,11 +332,24 @@ class JournalEntryItem(models.Model):
             line.debit = balance if balance > 0.0 else 0.0
             line.credit = -balance if balance < 0.0 else 0.0
 
-    @api.depends("move_id.currency_id")
+    @api.depends("move_id.currency_id", "move_id.company_id.currency_id")
     def _compute_currency_id(self):
+        """Default 'currency_id' from the parent entry, then the company.
+
+        Reads through 'move_id' directly (not the stored, related
+        'company_currency_id') and falls back to 'self.env.company' -- a
+        plain, always-synchronously-resolvable field -- as the last
+        resort, so this required field never precomputes to an empty
+        value while 'move_id'/'company_currency_id' are still settling
+        during create(). See 'journal_entry._compute_currency_id' for the
+        same pattern on the header.
+        """
         for line in self:
             line.currency_id = (
-                line.move_id.currency_id or line.currency_id or line.company_currency_id
+                line.move_id.currency_id
+                or line.move_id.company_id.currency_id
+                or line.currency_id
+                or self.env.company.currency_id
             )
 
     @api.depends("currency_id", "company_currency_id")

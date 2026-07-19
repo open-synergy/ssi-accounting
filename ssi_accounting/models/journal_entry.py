@@ -196,13 +196,22 @@ class JournalEntry(models.Model):
         for move in self:
             move.journal_group_id = move.journal_id.journal_group_ids[:1]
 
-    @api.depends("journal_id.currency_id", "company_id.currency_id")
+    @api.depends("journal_id.currency_id", "journal_id.company_id.currency_id")
     def _compute_currency_id(self):
+        """Default 'currency_id' from the journal, then the company.
+
+        Reads through 'journal_id' directly (not the stored, related
+        'company_id') and falls back to 'self.env.company' -- a plain,
+        always-synchronously-resolvable field -- as the last resort, so
+        this required field never precomputes to an empty value while
+        'journal_id'/'company_id' are still settling during create().
+        """
         for move in self:
             move.currency_id = (
                 move.journal_id.currency_id
-                or move.company_id.currency_id
+                or move.journal_id.company_id.currency_id
                 or move.currency_id
+                or self.env.company.currency_id
             )
 
     @api.depends("company_id")
