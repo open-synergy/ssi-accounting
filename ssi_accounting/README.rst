@@ -21,8 +21,9 @@ and its companion ``account.code.mapping``. It also has ``account.journal``/
 computation engine), and the journal entry itself: ``journal_entry`` and its
 child ``journal_entry.item``, including its posting/numbering/state machine
 and the synchronisation that turns a taxed line into real tax journal items.
-Reconciliation and exchange-rate differences are added incrementally by
-later units.
+A posted entry can also be reversed through the ``journal_entry_reversal``
+wizard, producing a mirror entry tied back to the original. Reconciliation
+and exchange-rate differences are added incrementally by later units.
 
 
 Design decisions
@@ -276,6 +277,21 @@ Design decisions
   unit -- the prior tax-computation-engine unit deliberately left it
   unported, since nothing yet produced "existing tax line" dicts for it
   to convert; this unit is that first consumer.
+* A posted ``journal_entry`` can be reversed through the ``journal_entry_reversal``
+  wizard (header button "Reverse Entry"), which builds a mirror entry whose lines
+  carry the opposite ``balance``/``amount_currency``, linked back through
+  ``reversed_entry_id``/``reversal_move_ids``. Unlike upstream ``account.move``,
+  there is no ``move_type`` to swap: the reverse repartition lines are selected
+  through ``journal_entry.is_refund``, a plain boolean the wizard sets explicitly
+  on the mirror entry -- never derived from ``state`` or any document-type concept.
+  ``refund_method`` on the wizard keeps only ``cancel``/``modify`` (upstream's third
+  value, ``refund``, is specific to invoice credit notes and dropped): ``cancel``
+  additionally reconciles the mirror entry against the original through
+  ``_reconcile_reversed_moves`` -- guarded as a forward reference on
+  ``"reconciled" in journal_entry.item._fields`` until a later reconciliation unit
+  adds ``reconcile()``/``amount_residual`` (not a declared dependency of this unit),
+  the same defensive pattern already used elsewhere in this module; ``modify``
+  additionally opens a fresh, editable draft copy of the original's lines.
 
 
 Installation

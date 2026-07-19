@@ -263,6 +263,35 @@ class JournalEntry(models.Model):
         currency_field="company_currency_id",
         help="Sum of the credit of every line, in the company currency.",
     )
+    reversed_entry_id = fields.Many2one(
+        comodel_name="journal_entry",
+        string="Reversal Of",
+        index=True,
+        copy=False,
+        help="The journal entry this entry is a mirror reversal of, set "
+        "by the 'journal_entry_reversal' wizard.",
+    )
+    reversal_move_ids = fields.One2many(
+        comodel_name="journal_entry",
+        inverse_name="reversed_entry_id",
+        string="Reversals",
+        help="Journal entries that reverse this one.",
+    )
+    reversal_move_count = fields.Integer(
+        compute="_compute_reversal_move_count",
+        help="Technical field: number of 'reversal_move_ids', shown on "
+        "the smart button.",
+    )
+    is_refund = fields.Boolean(
+        copy=False,
+        help="Technical field: whether this entry's tax lines must be "
+        "synced from the 'reverse' repartition lines instead of the "
+        "'base' ones. Set explicitly by the 'journal_entry_reversal' "
+        "wizard when it builds a mirror entry -- never derived from "
+        "'state' or a document-type concept (this model has none), per "
+        "this issue's Keputusan Desain. See "
+        "'_prepare_product_base_line_for_taxes_computation'.",
+    )
 
     @api.depends("name")
     def _compute_display_name(self):
@@ -552,6 +581,11 @@ class JournalEntry(models.Model):
         for move in self:
             move.has_reconciled_entries = len(move.line_ids._reconciled_lines()) > 1
 
+    @api.depends("reversal_move_ids")
+    def _compute_reversal_move_count(self):
+        for move in self:
+            move.reversal_move_count = len(move.reversal_move_ids)
+
     # ======================================================================
     # STATE MACHINE
     # ======================================================================
@@ -747,6 +781,248 @@ Solution: The entry is accounted on %(new_date)s instead
         if unnumbered:
             unnumbered.write(vals)
 
+    # ======================================================================
+    # REVERSAL
+    # ======================================================================
+    # A posted entry is never corrected in place -- it is mirrored by a
+    # reversal entry instead (see the class docstring's rationale and this
+    # issue's Keputusan Desain). Ported (behaviour-wise, simplified: no
+    # 'move_type' swap, no invoice-specific default values -- neither
+    # concept exists on this model) from Odoo core
+    # ``addons/account/models/account_move.py``'s own reversal methods.
+    # Driven end-to-end by the 'journal_entry_reversal' wizard
+    # (``wizards/journal_entry_reversal.py``); 'action_reverse' below only
+    # opens it.
+
+    def action_reverse(self):
+        # NOT '.sudo()' -- unlike the generic SSI button pattern, this
+        # method only ever opens a wizard (no cross-model read that
+        # needs elevated access), and '_post()' (reached later, once the
+        # wizard confirms) deliberately keys its own accounting-group
+        # check off 'self.env.su' -- sudo-ing here would silently let
+        # any user post a reversal regardless of that check. Matches
+        # 'action_post'/'button_draft'/'button_cancel' above, none of
+        # which sudo either.
+        for record in self:
+            result = record._reverse()
+        return result
+
+    def _reverse(self):
+        """Open the 'journal_entry_reversal' wizard, pre-filled with 'self'.
+
+        Ported (behaviour-wise) from Odoo core
+        ``AccountMove.action_reverse``.
+        """
+        self.ensure_one()
+        return {
+            "name": self.env._("Reverse Entry"),
+            "type": "ir.actions.act_window",
+            "res_model": "journal_entry_reversal",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_move_ids": [Command.set(self.ids)],
+                "default_date": fields.Date.context_today(self),
+            },
+        }
+
+    def action_view_reversal_moves(self):
+        for record in self:
+            result = record._view_reversal_moves()
+        return result
+
+    def _view_reversal_moves(self):
+        """Open 'reversal_move_ids' -- backs the header smart button."""
+        self.ensure_one()
+        return {
+            "name": self.env._("Reversal Entries"),
+            "type": "ir.actions.act_window",
+            "res_model": "journal_entry",
+            "view_mode": "list,form",
+            "domain": [("id", "in", self.reversal_move_ids.ids)],
+        }
+
+    def _prepare_reversal_line_vals(self, line, negate):
+        """Build create() vals for one mirror line of a reversal/copy entry.
+
+        Only ever called with a 'product'/'line_section'/'line_note'
+        'line' -- every caller filters out 'tax'-typed lines first, since
+        those are left for the *new* entry's own ``create()``
+        (``_sync_dynamic_lines``/``_sync_tax_lines``) to regenerate from
+        scratch, driven by that entry's own 'is_refund' flag (selecting
+        the reverse repartition lines for a true reversal, the base ones
+        for the 'modify' method's plain copy -- see the class docstring's
+        tax engine section and this issue's Keputusan Desain).
+
+        :param line: a ``journal_entry.item`` of ``self``.
+        :param negate: whether ``balance``/``amount_currency`` are
+            flipped (a true reversal) or kept as-is (the 'modify'
+            method's fresh, editable draft copy).
+        :return: a vals dict suitable for ``Command.create``.
+        """
+        sign = -1 if negate else 1
+        vals = {
+            "name": line.name,
+            "sequence": line.sequence,
+            "display_type": line.display_type,
+            "account_id": line.account_id.id,
+            "partner_id": line.partner_id.id,
+            "product_id": line.product_id.id,
+            "quantity": line.quantity,
+            "price_unit": line.price_unit,
+            "discount": line.discount,
+            "date_maturity": line.date_maturity,
+            "currency_id": line.currency_id.id,
+            "balance": sign * line.balance,
+            "amount_currency": sign * line.amount_currency,
+        }
+        if line.display_type == "product":
+            vals["tax_ids"] = [Command.set(line.tax_ids.ids)]
+        return vals
+
+    def _reverse_move_vals(self, default_values=None):
+        """Build create() vals for the mirror entry reversing 'self'.
+
+        Ported (behaviour-wise) from Odoo core
+        ``AccountMove._reverse_move_vals``, simplified: no 'move_type'
+        swap (this model has none -- see the class docstring), so
+        'is_refund' is set directly instead, and no invoice-specific
+        vals (payment term, due date, ...) exist to strip.
+
+        :param default_values: optional dict overriding 'journal_id'/
+            'date'/'ref' -- see 'journal_entry_reversal._prepare_default_reversal'.
+        :return: a vals dict suitable for ``journal_entry.create()``.
+        """
+        self.ensure_one()
+        default_values = default_values or {}
+        return {
+            "journal_id": default_values.get("journal_id", self.journal_id.id),
+            "date": default_values.get("date") or fields.Date.context_today(self),
+            "ref": default_values.get("ref")
+            or self.env._("Reversal of: %(name)s", name=self.display_name),
+            "partner_id": self.partner_id.id,
+            "is_refund": True,
+            "line_ids": [
+                Command.create(self._prepare_reversal_line_vals(line, negate=True))
+                for line in self.line_ids
+                if line.display_type != "tax"
+            ],
+        }
+
+    def _prepare_modify_move_vals(self, default_values=None):
+        """Build create() vals for the 'modify' method's fresh draft copy.
+
+        Unlike '_reverse_move_vals', lines are copied as-is (not
+        negated) and 'is_refund' is left at its default ('False'): this
+        entry is a plain, editable continuation of 'self', not a
+        reversal -- see the 'refund_method' field's help text on
+        'journal_entry_reversal'.
+
+        :param default_values: optional dict, same shape as
+            '_reverse_move_vals''s own parameter.
+        :return: a vals dict suitable for ``journal_entry.create()``.
+        """
+        self.ensure_one()
+        default_values = default_values or {}
+        return {
+            "journal_id": default_values.get("journal_id", self.journal_id.id),
+            "date": default_values.get("date") or fields.Date.context_today(self),
+            "ref": self.ref,
+            "partner_id": self.partner_id.id,
+            "line_ids": [
+                Command.create(self._prepare_reversal_line_vals(line, negate=False))
+                for line in self.line_ids
+                if line.display_type != "tax"
+            ],
+        }
+
+    def _set_reversed_entry(self, reverse_move):
+        """Link 'reverse_move' back to 'self' as its reversal counterpart."""
+        self.ensure_one()
+        reverse_move.reversed_entry_id = self.id
+
+    def _reverse_moves(self, default_values_list=None, cancel=False):
+        """Create, link, and post mirror entries reversing each of 'self'.
+
+        Ported (behaviour-wise) from Odoo core
+        ``AccountMove._reverse_moves``.
+
+        :param default_values_list: list of dicts, same length/order as
+            'self', each overriding '_reverse_move_vals''s own defaults
+            for the matching entry.
+        :param cancel: whether to also auto-reconcile each entry against
+            its reversal -- see '_reconcile_reversed_moves' (a no-op
+            until issue #12 lands, see this issue's Keputusan Desain).
+        :return: the created, posted reversal entries, in the same
+            order as 'self'.
+        """
+        if not default_values_list:
+            default_values_list = [{}] * len(self)
+        reverse_moves = self.env["journal_entry"].create(
+            [
+                move._reverse_move_vals(default_values)
+                for move, default_values in zip(self, default_values_list, strict=False)
+            ]
+        )
+        for move, reverse_move in zip(self, reverse_moves, strict=False):
+            move._set_reversed_entry(reverse_move)
+        reverse_moves._post()
+        if cancel:
+            self._reconcile_reversed_moves(reverse_moves)
+        return reverse_moves
+
+    def _reconcile_reversed_moves(self, reverse_moves):
+        """Auto-reconcile each of 'self' against its matching 'reverse_moves'.
+
+        Ported (behaviour-wise) from Odoo core
+        ``AccountMove._reconcile_reversed_moves``.
+
+        **Guarded as a forward reference**: 'journal_entry.item' has no
+        'reconcile()'/'amount_residual' yet -- those are added by a
+        later reconciliation unit (issue #12), which does **not**
+        declare a dependency on this one, so they must not be assumed
+        here (see this issue's Keputusan Desain). No-ops until then,
+        the same pattern already used by ``account.py``'s
+        ``_toggle_reconcile_to_true``/``_toggle_reconcile_to_false``;
+        starts reconciling for real the moment #12 lands, without any
+        further change here.
+
+        :param reverse_moves: the reversal entries, in the same
+            order as 'self' (see '_reverse_moves').
+        """
+        if "reconciled" not in self.env["journal_entry.item"]._fields:
+            return
+        for move, reverse_move in zip(self, reverse_moves, strict=False):
+            accounts = move.line_ids.account_id.filtered(
+                lambda account: account.reconcile
+            )
+            for account in accounts:
+                (move.line_ids + reverse_move.line_ids).filtered(
+                    lambda line, account=account: (
+                        line.account_id == account and not line.reconciled
+                    )
+                ).reconcile()
+
+    def _unlink_or_reverse(self):
+        """Safely dispose of 'self': unlink entries never posted, reverse the rest.
+
+        Ported (behaviour-wise) from Odoo core
+        ``AccountMove._unlink_or_reverse`` -- a utility a later unit can
+        call to get rid of a journal entry without ever hard-deleting
+        one that was posted. Not wired to any button in this issue (see
+        its "Tidak termasuk" section); ported now so a later unit's own
+        Kriteria Penerimaan does not have to re-derive it from scratch.
+        """
+        if not self:
+            return
+        to_reverse = self.filtered(
+            lambda move: move.posted_before or move.state != "draft"
+        )
+        to_unlink = self - to_reverse
+        to_reverse._reverse_moves(cancel=True)
+        to_unlink.filtered(lambda move: move.state != "cancel").button_cancel()
+        to_unlink.unlink()
+
     @api.model
     def _disable_recursion(self, container, method_name, default=None, target=True):
         """Guard against a method recursively triggering itself.
@@ -813,6 +1089,14 @@ Solution: The entry is accounted on %(new_date)s instead
         ``quantity``/``price_unit`` stay informational -- do not fork the
         engine to make them drive the tax base.**
 
+        ``is_refund`` is threaded through from ``self.is_refund`` (see
+        that field's own help text) -- this is the sole, explicit switch
+        the tax engine (``tax._prepare_base_line_for_taxes_computation``)
+        uses to select ``repartition_line_reverse_ids`` over
+        ``repartition_line_base_ids``, per the reversal issue's Keputusan
+        Desain. Never derive it from ``state`` or any document-type
+        concept here -- this model has neither.
+
         :param product_line: a ``journal_entry.item`` with
             ``display_type == 'product'``.
         :return: a base line, see ``tax._prepare_base_line_for_taxes_computation``.
@@ -825,6 +1109,7 @@ Solution: The entry is accounted on %(new_date)s instead
             "rate": self._get_product_base_line_currency_rate(product_line),
             "sign": 1,
             "special_mode": "total_excluded",
+            "is_refund": self.is_refund,
             "name": product_line.name,
         }
 

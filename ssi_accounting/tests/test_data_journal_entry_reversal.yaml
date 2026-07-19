@@ -1,0 +1,530 @@
+options:
+  auto_refresh: true
+
+scenarios:
+  - name: "Reversing a posted two-line entry mirrors debit and credit"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reversal Journal 1"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Reversal Account 1A"
+          account_type: "asset_current"
+          code: "JER1A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Reversal Account 1B"
+          account_type: "income"
+          code: "JER1B"
+      - step: "Create and post a two-line entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-04-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 100.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 100.0
+      - step: "Post the entry"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "posted"
+      - step: "Create the reversal wizard, method 'cancel'"
+        action: "create"
+        model: "journal_entry_reversal"
+        save_as: "wizard"
+        values:
+          move_ids:
+            - - 6
+              - 0
+              - - "REC: entry.id"
+          date: 2026-04-15
+          refund_method: "cancel"
+      - step: "Confirm the reversal"
+        action: "call"
+        target: "wizard"
+        method: "action_reverse_moves"
+        as_user: "base.user_admin"
+      - step: "Find the reversal entry"
+        action: "search"
+        model: "journal_entry"
+        domain: [["reversed_entry_id", "=", "REC: entry.id"]]
+        save_as: "reversal"
+        expect_count: 1
+      - step: "Assert the reversal is dated from the wizard and posted"
+        action: "assert"
+        target: "reversal"
+        asserts:
+          date:
+            type: "value"
+            expected: 2026-04-15
+          state:
+            type: "value"
+            expected: "posted"
+      - step: "Assert the original links back through 'reversal_move_ids'"
+        action: "assert"
+        target: "entry"
+        refresh: true
+        asserts:
+          reversal_move_count:
+            type: "value"
+            expected: 1
+          reversal_move_ids:
+            type: "o2m"
+            check: "exact"
+            expected_records:
+              - "REC: reversal"
+      - step: "Find the mirrored debit-side line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: reversal.id"], ["account_id", "=", "REC: acc_a.id"]]
+        save_as: "rev_line_a"
+        limit: 1
+      - step: "Assert it became a credit line"
+        action: "assert"
+        target: "rev_line_a"
+        asserts:
+          debit:
+            type: "value"
+            expected: 0.0
+          credit:
+            type: "value"
+            expected: 100.0
+      - step: "Find the mirrored credit-side line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: reversal.id"], ["account_id", "=", "REC: acc_b.id"]]
+        save_as: "rev_line_b"
+        limit: 1
+      - step: "Assert it became a debit line"
+        action: "assert"
+        target: "rev_line_b"
+        asserts:
+          debit:
+            type: "value"
+            expected: 100.0
+          credit:
+            type: "value"
+            expected: 0.0
+
+  - name: "Method 'modify' reverses, then opens an editable draft copy"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reversal Journal 2"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Reversal Account 2A"
+          account_type: "asset_current"
+          code: "JER2A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Reversal Account 2B"
+          account_type: "income"
+          code: "JER2B"
+      - step: "Create and post a two-line entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          ref: "Original Entry 2"
+          date: 2026-04-02
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 50.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 50.0
+      - step: "Post the entry"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create the reversal wizard, method 'modify'"
+        action: "create"
+        model: "journal_entry_reversal"
+        save_as: "wizard"
+        values:
+          move_ids:
+            - - 6
+              - 0
+              - - "REC: entry.id"
+          date: 2026-04-20
+          refund_method: "modify"
+      - step: "Confirm the reversal"
+        action: "call"
+        target: "wizard"
+        method: "action_reverse_moves"
+        as_user: "base.user_admin"
+      - step: "Find the reversal entry (still created and posted)"
+        action: "search"
+        model: "journal_entry"
+        domain: [["reversed_entry_id", "=", "REC: entry.id"]]
+        save_as: "reversal"
+        expect_count: 1
+      - step: "Assert the reversal itself is posted"
+        action: "assert"
+        target: "reversal"
+        asserts:
+          state:
+            type: "value"
+            expected: "posted"
+      - step: "Find the new editable draft copy"
+        action: "search"
+        model: "journal_entry"
+        domain: [["journal_id", "=", "REC: journal.id"], ["state", "=", "draft"]]
+        save_as: "draft_copy"
+        expect_count: 1
+      - step: "Assert the draft copy carries the original's reference and lines"
+        action: "assert"
+        target: "draft_copy"
+        asserts:
+          ref:
+            type: "value"
+            expected: "Original Entry 2"
+          amount_total_debit:
+            type: "value"
+            expected: 50.0
+          amount_total_credit:
+            type: "value"
+            expected: 50.0
+
+  - name:
+      "Reversing a taxed entry uses the reverse repartition, sign and account flipped"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group Reversal 1"
+      - step: "Create the base tax account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_base_tax"
+        values:
+          name: "VAT Payable (Base)"
+          account_type: "liability_current"
+          code: "JER3TAXBASE"
+      - step: "Create the reverse tax account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_reverse_tax"
+        values:
+          name: "VAT Payable (Reverse)"
+          account_type: "liability_current"
+          code: "JER3TAXREV"
+      - step: "Create VAT 11% with distinct base/reverse repartition accounts"
+        action: "create"
+        model: "tax"
+        save_as: "vat11"
+        values:
+          name: "VAT 11% (Reversal 3)"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: vat_group.id"
+          repartition_line_base_ids:
+            - - 0
+              - 0
+              - document_type: "base"
+                repartition_type: "base"
+            - - 0
+              - 0
+              - document_type: "base"
+                repartition_type: "tax"
+                account_id: "REC: acc_base_tax.id"
+          repartition_line_reverse_ids:
+            - - 0
+              - 0
+              - document_type: "reverse"
+                repartition_type: "base"
+            - - 0
+              - 0
+              - document_type: "reverse"
+                repartition_type: "tax"
+                account_id: "REC: acc_reverse_tax.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reversal Journal 3"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Reversal Expense Account 3"
+          account_type: "expense"
+          code: "JER3001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Reversal Payable Account 3"
+          account_type: "liability_current"
+          code: "JER3002"
+      - step: "Create and post an entry with a taxed debit line"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 1000000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: vat11.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -1110000.0
+      - step: "Post the entry"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find the original tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
+        save_as: "orig_tax_line"
+        limit: 1
+      - step: "Assert the original tax line posts to the base repartition account"
+        action: "assert"
+        target: "orig_tax_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: 110000.0
+          account_id:
+            type: "m2o"
+            expected: "REC: acc_base_tax"
+      - step: "Create the reversal wizard"
+        action: "create"
+        model: "journal_entry_reversal"
+        save_as: "wizard"
+        values:
+          move_ids:
+            - - 6
+              - 0
+              - - "REC: entry.id"
+          date: 2026-04-21
+          refund_method: "cancel"
+      - step: "Confirm the reversal"
+        action: "call"
+        target: "wizard"
+        method: "action_reverse_moves"
+        as_user: "base.user_admin"
+      - step: "Find the reversal entry"
+        action: "search"
+        model: "journal_entry"
+        domain: [["reversed_entry_id", "=", "REC: entry.id"]]
+        save_as: "reversal"
+        expect_count: 1
+      - step: "Find the reversal's tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: reversal.id"], ["display_type", "=", "tax"]]
+        save_as: "rev_tax_line"
+        limit: 1
+      - step:
+          "Assert the reversal's tax line uses the reverse account with the sign flipped"
+        action: "assert"
+        target: "rev_tax_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: -110000.0
+          account_id:
+            type: "m2o"
+            expected: "REC: acc_reverse_tax"
+
+  - name: "Reversing a draft entry is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reversal Journal 4"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Reversal Account 4A"
+          account_type: "asset_current"
+          code: "JER4A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Reversal Account 4B"
+          account_type: "income"
+          code: "JER4B"
+      - step: "Create a draft entry (never posted)"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-04-03
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 10.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 10.0
+      - step: "Create the reversal wizard for the draft entry"
+        action: "create"
+        model: "journal_entry_reversal"
+        save_as: "wizard"
+        values:
+          move_ids:
+            - - 6
+              - 0
+              - - "REC: entry.id"
+          date: 2026-04-04
+          refund_method: "cancel"
+      - step: "Confirming the reversal is rejected"
+        action: "call"
+        target: "wizard"
+        method: "action_reverse_moves"
+        as_user: "base.user_admin"
+        expect_error:
+          type: "UserError"
+          message_contains: "not posted"
+
+  - name: "Reversing a cancelled entry is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reversal Journal 5"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Reversal Account 5A"
+          account_type: "asset_current"
+          code: "JER5A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Reversal Account 5B"
+          account_type: "income"
+          code: "JER5B"
+      - step: "Create and post an entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-04-05
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 20.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 20.0
+      - step: "Post the entry"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Cancel the entry"
+        action: "call"
+        target: "entry"
+        method: "button_cancel"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "cancel"
+      - step: "Create the reversal wizard for the cancelled entry"
+        action: "create"
+        model: "journal_entry_reversal"
+        save_as: "wizard"
+        values:
+          move_ids:
+            - - 6
+              - 0
+              - - "REC: entry.id"
+          date: 2026-04-06
+          refund_method: "cancel"
+      - step: "Confirming the reversal is rejected"
+        action: "call"
+        target: "wizard"
+        method: "action_reverse_moves"
+        as_user: "base.user_admin"
+        expect_error:
+          type: "UserError"
+          message_contains: "not posted"

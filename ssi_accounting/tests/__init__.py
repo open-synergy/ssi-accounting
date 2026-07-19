@@ -10,6 +10,7 @@ from . import test_account_tag
 from . import test_journal
 from . import test_journal_entry
 from . import test_journal_entry_posting
+from . import test_journal_entry_reversal
 from . import test_journal_group
 from . import test_mixin_sequence_number
 from . import test_res_company
