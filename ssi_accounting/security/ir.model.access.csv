@@ -17,6 +17,10 @@ access_journal_entry_all,journal_entry - all,model_journal_entry,base.group_user
 access_journal_entry_user,journal_entry - user,model_journal_entry,group_accounting_user,1,1,1,1
 access_journal_entry_item_all,journal_entry.item - all,model_journal_entry_item,base.group_user,1,0,0,0
 access_journal_entry_item_user,journal_entry.item - user,model_journal_entry_item,group_accounting_user,1,1,1,1
+access_reconcile_partial_all,reconcile_partial - all,model_reconcile_partial,base.group_user,1,0,0,0
+access_reconcile_partial_user,reconcile_partial - user,model_reconcile_partial,group_accounting_user,1,1,1,1
+access_reconcile_full_all,reconcile_full - all,model_reconcile_full,base.group_user,1,0,0,0
+access_reconcile_full_user,reconcile_full - user,model_reconcile_full,group_accounting_user,1,1,1,1
 access_tax_group_all,tax_group - all,model_tax_group,base.group_user,1,0,0,0
 access_tax_group_manager,tax_group - manager,model_tax_group,group_accounting_manager,1,1,1,1
 access_tax_all,tax - all,model_tax,base.group_user,1,0,0,0

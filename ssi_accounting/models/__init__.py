@@ -17,6 +17,8 @@ from . import (
     journal_entry,
     journal_entry_item,
     journal_group,
+    reconcile_full,
+    reconcile_partial,
     res_company,
     res_currency,
     tax,

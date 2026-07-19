@@ -2,7 +2,12 @@
 # Copyright 2026 PT. Simetri Sinergi Indonesia
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo import api, fields, models
+import logging
+
+from odoo import Command, api, fields, models
+from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 DISPLAY_TYPE_SELECTION = [
     ("product", "Item"),
@@ -404,6 +409,75 @@ class JournalEntryItem(models.Model):
         "a separate, later unit.",
     )
 
+    # === Reconciliation fields ===
+    # Ported (behaviour-wise) from upstream ``account.move.line``'s own
+    # reconciliation fields -- see ``reconcile()``/the RECONCILIATION
+    # methods section near the end of this class for the algorithm
+    # writing them, and ``reconcile_partial``/``reconcile_full`` for the
+    # two models they point to.
+    reconciled = fields.Boolean(
+        compute="_compute_amount_residual",
+        store=True,
+        help="Whether this line's residual is fully matched by "
+        "'reconcile_partial'/'reconcile_full' rows.",
+    )
+    amount_residual = fields.Monetary(
+        string="Residual Amount",
+        currency_field="company_currency_id",
+        compute="_compute_amount_residual",
+        store=True,
+        help="The residual amount on this line, in the company currency. "
+        "Zero once fully reconciled, the original 'balance' while "
+        "unreconciled, something in-between while partially reconciled.",
+    )
+    amount_residual_currency = fields.Monetary(
+        string="Residual Amount in Currency",
+        currency_field="currency_id",
+        compute="_compute_amount_residual",
+        store=True,
+        help="The residual amount on this line, in 'currency_id'.",
+    )
+    full_reconcile_id = fields.Many2one(
+        comodel_name="reconcile_full",
+        string="Matching",
+        copy=False,
+        index="btree_not_null",
+        readonly=True,
+        help="Set once this line is matched down to zero residual -- see "
+        "'reconcile_partial._update_matching_number'.",
+    )
+    matched_debit_ids = fields.One2many(
+        comodel_name="reconcile_partial",
+        inverse_name="credit_move_id",
+        string="Matched Debits",
+        readonly=True,
+        help="Debit journal items matched with this (credit) journal item.",
+    )
+    matched_credit_ids = fields.One2many(
+        comodel_name="reconcile_partial",
+        inverse_name="debit_move_id",
+        string="Matched Credits",
+        readonly=True,
+        help="Credit journal items matched with this (debit) journal item.",
+    )
+    reconciled_lines_ids = fields.Many2many(
+        comodel_name="journal_entry.item",
+        compute="_compute_reconciled_lines_ids",
+        compute_sudo=True,
+        help="Technical field: the other side of every "
+        "'matched_debit_ids'/'matched_credit_ids' pairing on this line, "
+        "restricted to lines readable by the current user.",
+    )
+    matching_number = fields.Char(
+        string="Matching #",
+        copy=False,
+        index=True,
+        help="'P<n>' while only partially reconciled, or the id of the "
+        "'reconcile_full' row once fully reconciled. Written exclusively "
+        "by 'reconcile_partial._update_matching_number' -- see its own "
+        "docstring; this field has no 'compute=' of its own.",
+    )
+
     _check_accountable_required_fields = models.Constraint(
         "CHECK(display_type IN ('line_section', 'line_note') "
         "OR account_id IS NOT NULL)",
@@ -537,6 +611,116 @@ class JournalEntryItem(models.Model):
                 continue
             line.price_subtotal = line.amount_currency
             line.price_total = line.amount_currency
+
+    @api.depends(
+        "balance",
+        "amount_currency",
+        "account_id",
+        "currency_id",
+        "company_id",
+        "matched_debit_ids",
+        "matched_credit_ids",
+    )
+    def _compute_amount_residual(self):
+        """Residual amount left on a reconcilable line, in both currencies.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._compute_amount_residual``, trimmed of the
+        ``asset_cash``/``liability_credit_card`` exemption upstream
+        grants ``need_residual_lines`` -- this issue's Keputusan Desain
+        restricts reconciliation strictly to ``account_id.reconcile ==
+        True`` (bank-statement reconciliation, the upstream exemption's
+        only real use, is out of this issue's scope -- see the class
+        docstring and ``_check_amls_exigibility_for_reconciliation``).
+        """
+        need_residual_lines = self.filtered(lambda line: line.account_id.reconcile)
+        stored_lines = need_residual_lines._origin
+
+        if stored_lines:
+            self.env["reconcile_partial"].flush_model()
+            self.env["res.currency"].flush_model(["decimal_places"])
+            aml_ids = tuple(stored_lines.ids)
+            self.env.cr.execute(
+                """
+                SELECT
+                    part.debit_move_id AS line_id,
+                    'debit' AS flag,
+                    COALESCE(SUM(part.amount), 0.0) AS amount,
+                    ROUND(SUM(part.debit_amount_currency), curr.decimal_places)
+                        AS amount_currency
+                  FROM reconcile_partial part
+                  JOIN res_currency curr ON curr.id = part.debit_currency_id
+                 WHERE part.debit_move_id IN %s
+              GROUP BY part.debit_move_id, curr.decimal_places
+                UNION ALL
+                SELECT
+                    part.credit_move_id AS line_id,
+                    'credit' AS flag,
+                    COALESCE(SUM(part.amount), 0.0) AS amount,
+                    ROUND(SUM(part.credit_amount_currency), curr.decimal_places)
+                        AS amount_currency
+                  FROM reconcile_partial part
+                  JOIN res_currency curr ON curr.id = part.credit_currency_id
+                 WHERE part.credit_move_id IN %s
+              GROUP BY part.credit_move_id, curr.decimal_places
+                """,
+                [aml_ids, aml_ids],
+            )
+            amounts_map = {
+                (line_id, flag): (amount, amount_currency)
+                for line_id, flag, amount, amount_currency in self.env.cr.fetchall()
+            }
+        else:
+            amounts_map = {}
+
+        for line in self - need_residual_lines:
+            line.amount_residual = 0.0
+            line.amount_residual_currency = 0.0
+            line.reconciled = False
+
+        for line in need_residual_lines:
+            comp_curr = line.company_currency_id or self.env.company.currency_id
+            foreign_curr = line.currency_id or comp_curr
+            debit_amount, debit_amount_currency = amounts_map.get(
+                (line._origin.id, "debit"), (0.0, 0.0)
+            )
+            credit_amount, credit_amount_currency = amounts_map.get(
+                (line._origin.id, "credit"), (0.0, 0.0)
+            )
+            line.amount_residual = comp_curr.round(
+                line.balance - debit_amount + credit_amount
+            )
+            line.amount_residual_currency = foreign_curr.round(
+                line.amount_currency - debit_amount_currency + credit_amount_currency
+            )
+            line.reconciled = comp_curr.is_zero(
+                line.amount_residual
+            ) and foreign_curr.is_zero(line.amount_residual_currency)
+
+    @api.depends("matched_debit_ids", "matched_credit_ids")
+    def _compute_reconciled_lines_ids(self):
+        """Mirror of the counterpart line of every matched partial.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._compute_reconciled_lines_ids``, trimmed of the
+        Bankrec-widget-only ``first_reconciled_lines_id``/
+        ``count_reconciled_lines`` fields and of its own ``inverse=``
+        (that inverse exists solely to let the OWL widget drive
+        ``reconcile()`` by assigning into this field -- this issue's UI
+        wave drives it through ``action_reconcile`` instead, see the
+        class docstring's "UI gelombang pertama" decision).
+        """
+        accessible_lines = set(
+            (
+                self.matched_debit_ids.debit_move_id
+                + self.matched_credit_ids.credit_move_id
+            )._filtered_access("read")
+        )
+        for line in self:
+            line.sudo().reconciled_lines_ids = (
+                line.matched_debit_ids.debit_move_id
+                + line.matched_credit_ids.credit_move_id
+            ).filtered(accessible_lines.__contains__)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -692,3 +876,931 @@ class JournalEntryItem(models.Model):
             return
         for move in self.move_id:
             move._check_balanced({"records": move})
+
+    # ======================================================================
+    # RECONCILIATION
+    # ======================================================================
+    # Ported (behaviour-wise) from Odoo core ``account_move_line.py``'s own
+    # "RECONCILIATION" section. Everything invoice/payment/cash-basis/
+    # exchange-difference shaped is dropped -- see this issue's Keputusan
+    # Desain and the individual method docstrings below for what and why.
+
+    def _get_reconciliation_aml_field_value(self, field, shadowed_aml_values):
+        """Read 'field' off 'self', unless 'shadowed_aml_values' overrides it.
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``AccountMoveLine._get_reconciliation_aml_field_value``.
+        """
+        self.ensure_one()
+        if shadowed_aml_values and field in shadowed_aml_values.get(self, {}):
+            return shadowed_aml_values[self][field]
+        return self[field]
+
+    @api.model
+    def _prepare_move_line_residual_amounts(
+        self,
+        aml_values,
+        counterpart_currency,
+        shadowed_aml_values=None,
+        other_aml_values=None,
+    ):
+        """Available residual amounts of one line, per currency it could reconcile in.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._prepare_move_line_residual_amounts``, trimmed
+        of the ``is_payment()``/``is_invoice()`` branches inside its
+        nested ``get_odoo_rate`` -- neither payment nor invoice is a
+        concept on this model (see the class docstring), so the
+        accounting-rate date always falls back to the line's own 'date'.
+        ``other_aml_values`` is kept in the signature (unused) only to
+        match the caller's shape -- it fed exclusively into the dropped
+        ``is_payment(other_aml)`` check upstream.
+
+        :param aml_values: this line's 'aml'/'amount_residual'/
+            'amount_residual_currency' dict (see '_reconcile_plan_with_sync').
+        :param counterpart_currency: the currency of the line this one is
+            being matched against.
+        :param shadowed_aml_values: optional aml -> dict override, used to
+            preview a reconciliation before committing field changes.
+        :param other_aml_values: unused, see above.
+        :return: a mapping currency -> {'residual': ..., 'rate': ...}.
+        """
+        del other_aml_values
+
+        def get_odoo_rate(aml, currency):
+            if forced_rate := self.env.context.get("forced_rate_from_register_payment"):
+                return forced_rate
+            exchange_rate_date = aml._get_reconciliation_aml_field_value(
+                "date", shadowed_aml_values
+            )
+            return currency._get_conversion_rate(
+                aml.company_currency_id, currency, aml.company_id, exchange_rate_date
+            )
+
+        def get_accounting_rate(aml, currency):
+            balance = aml._get_reconciliation_aml_field_value(
+                "balance", shadowed_aml_values
+            )
+            amount_currency = aml._get_reconciliation_aml_field_value(
+                "amount_currency", shadowed_aml_values
+            )
+            if not aml.company_currency_id.is_zero(balance) and not currency.is_zero(
+                amount_currency
+            ):
+                return abs(amount_currency / balance)
+            return None
+
+        aml = aml_values["aml"]
+        remaining_amount_curr = aml_values["amount_residual_currency"]
+        remaining_amount = aml_values["amount_residual"]
+        company_currency = aml.company_currency_id
+        currency = aml._get_reconciliation_aml_field_value(
+            "currency_id", shadowed_aml_values
+        )
+        account = aml._get_reconciliation_aml_field_value(
+            "account_id", shadowed_aml_values
+        )
+        has_zero_residual = company_currency.is_zero(remaining_amount)
+        has_zero_residual_currency = currency.is_zero(remaining_amount_curr)
+        is_rec_pay_account = account.account_type in (
+            "asset_receivable",
+            "liability_payable",
+        )
+
+        available_residual_per_currency = {}
+
+        if not has_zero_residual:
+            available_residual_per_currency[company_currency] = {
+                "residual": remaining_amount,
+                "rate": 1,
+            }
+        if currency != company_currency and not has_zero_residual_currency:
+            available_residual_per_currency[currency] = {
+                "residual": remaining_amount_curr,
+                "rate": get_accounting_rate(aml, currency),
+            }
+
+        if (
+            currency == company_currency
+            and is_rec_pay_account
+            and not has_zero_residual
+            and counterpart_currency != company_currency
+        ):
+            rate = get_odoo_rate(aml, counterpart_currency)
+            residual_in_foreign_curr = counterpart_currency.round(
+                remaining_amount * rate
+            )
+            if not counterpart_currency.is_zero(residual_in_foreign_curr):
+                available_residual_per_currency[counterpart_currency] = {
+                    "residual": residual_in_foreign_curr,
+                    "rate": rate,
+                }
+        elif (
+            currency == counterpart_currency
+            and currency != company_currency
+            and not has_zero_residual_currency
+        ):
+            available_residual_per_currency[counterpart_currency] = {
+                "residual": remaining_amount_curr,
+                "rate": get_accounting_rate(aml, currency),
+            }
+        return available_residual_per_currency
+
+    @api.model
+    def _prepare_reconciliation_single_partial_amounts(
+        self,
+        recon_currency,
+        company_currency,
+        debit_values,
+        credit_values,
+        debit_currency,
+        credit_currency,
+        debit_available_residual_amounts,
+        credit_available_residual_amounts,
+        min_recon_amount,
+        exchange_line_mode,
+    ):
+        """The '<amount, debit_amount_currency, credit_amount_currency>' triple.
+
+        Split out of '_prepare_reconciliation_single_partial' purely to
+        keep that method under this repo's mccabe complexity budget -- a
+        structural, not behavioural, deviation from a literal port (see
+        'item-format.md' §0/§6). Ported (behaviour-wise) from the
+        "Computation of partial amounts" section of upstream
+        ``AccountMoveLine._prepare_reconciliation_single_partial``,
+        rounding-avoidance block included: it corrects the *matching
+        amount itself*, not an exchange-difference entry (unlike the
+        block this issue drops -- see the caller's docstring), so it
+        stays even though this issue's tests are restricted to
+        single-currency reconciliation.
+        """
+        remaining_debit_amount = debit_values["amount_residual"]
+        remaining_credit_amount = credit_values["amount_residual"]
+
+        def get_amount_range_after_rate(currency_from, currency_to, amount, rate):
+            if not rate:
+                return 0.0, 0.0, 0.0
+            half_rounding = currency_from.rounding / 2
+            return (
+                currency_to.round((amount - half_rounding) * rate),
+                currency_to.round(amount * rate),
+                currency_to.round((amount + half_rounding) * rate),
+            )
+
+        if recon_currency == company_currency:
+            if exchange_line_mode:
+                debit_rate = None
+                credit_rate = None
+            else:
+                debit_rate = debit_available_residual_amounts.get(
+                    debit_currency, {}
+                ).get("rate")
+                credit_rate = credit_available_residual_amounts.get(
+                    credit_currency, {}
+                ).get("rate")
+
+            partial_amount = min_recon_amount
+
+            if debit_rate:
+                partial_debit_amount_currency = min(
+                    debit_currency.round(debit_rate * min_recon_amount),
+                    debit_values["amount_residual_currency"],
+                )
+            else:
+                partial_debit_amount_currency = 0.0
+            if credit_rate:
+                partial_credit_amount_currency = min(
+                    credit_currency.round(credit_rate * min_recon_amount),
+                    -credit_values["amount_residual_currency"],
+                )
+            else:
+                partial_credit_amount_currency = 0.0
+            return (
+                partial_amount,
+                partial_debit_amount_currency,
+                partial_credit_amount_currency,
+            )
+
+        # recon_currency != company_currency
+        if exchange_line_mode:
+            debit_rate = None
+            credit_rate = None
+        else:
+            debit_rate = debit_available_residual_amounts[recon_currency]["rate"]
+            credit_rate = credit_available_residual_amounts[recon_currency]["rate"]
+
+        partial_debit_amount_range = get_amount_range_after_rate(
+            debit_currency,
+            company_currency,
+            min_recon_amount,
+            (1 / debit_rate) if debit_rate else 0.0,
+        )
+        partial_debit_amount = min(
+            partial_debit_amount_range[1], remaining_debit_amount
+        )
+        partial_credit_amount_range = get_amount_range_after_rate(
+            credit_currency,
+            company_currency,
+            min_recon_amount,
+            (1 / credit_rate) if credit_rate else 0.0,
+        )
+        partial_credit_amount = min(
+            partial_credit_amount_range[1], -remaining_credit_amount
+        )
+        partial_amount = min(partial_debit_amount, partial_credit_amount)
+
+        if (
+            company_currency.compare_amounts(
+                partial_debit_amount, partial_credit_amount_range[2]
+            )
+            <= 0
+            and company_currency.compare_amounts(
+                partial_debit_amount, partial_credit_amount_range[0]
+            )
+            >= 0
+            and company_currency.compare_amounts(
+                partial_credit_amount, partial_debit_amount_range[2]
+            )
+            <= 0
+            and company_currency.compare_amounts(
+                partial_credit_amount, partial_debit_amount_range[0]
+            )
+            >= 0
+        ):
+            partial_amount = min(remaining_debit_amount, -remaining_credit_amount)
+            partial_debit_amount = partial_amount
+            partial_credit_amount = partial_amount
+
+        partial_debit_amount_currency = (
+            partial_amount if debit_currency == company_currency else min_recon_amount
+        )
+        partial_credit_amount_currency = (
+            partial_amount if credit_currency == company_currency else min_recon_amount
+        )
+        return (
+            partial_amount,
+            partial_debit_amount_currency,
+            partial_credit_amount_currency,
+        )
+
+    @api.model
+    def _prepare_reconciliation_single_partial(
+        self, debit_values, credit_values, shadowed_aml_values=None
+    ):
+        """Compute one 'reconcile_partial''s worth of matching between two lines.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._prepare_reconciliation_single_partial``,
+        **trimmed of the whole exchange-difference-vals block**
+        (``res['exchange_values']`` and everything computing it) --
+        selisih kurs entry generation is out of this issue's scope, a
+        later, dedicated currency unit's job (see the class docstring
+        and this issue's Keputusan Desain: 'exchange_move_id' stays
+        unpopulated by this unit). The currency/rate selection that
+        block also needs for the *matching amount itself*
+        ('exchange_line_mode' and the partial-amount computation) is
+        kept -- see '_prepare_reconciliation_single_partial_amounts'.
+        """
+        res = {"debit_values": debit_values, "credit_values": credit_values}
+        debit_aml = debit_values["aml"]
+        credit_aml = credit_values["aml"]
+        debit_currency = debit_aml._get_reconciliation_aml_field_value(
+            "currency_id", shadowed_aml_values
+        )
+        credit_currency = credit_aml._get_reconciliation_aml_field_value(
+            "currency_id", shadowed_aml_values
+        )
+        company_currency = debit_aml.company_currency_id
+
+        debit_available_residual_amounts = self._prepare_move_line_residual_amounts(
+            debit_values,
+            credit_currency,
+            shadowed_aml_values=shadowed_aml_values,
+            other_aml_values=credit_values,
+        )
+        credit_available_residual_amounts = self._prepare_move_line_residual_amounts(
+            credit_values,
+            debit_currency,
+            shadowed_aml_values=shadowed_aml_values,
+            other_aml_values=debit_values,
+        )
+
+        if (
+            debit_currency != company_currency
+            and debit_currency in debit_available_residual_amounts
+            and debit_currency in credit_available_residual_amounts
+        ):
+            recon_currency = debit_currency
+        elif (
+            credit_currency != company_currency
+            and credit_currency in debit_available_residual_amounts
+            and credit_currency in credit_available_residual_amounts
+        ):
+            recon_currency = credit_currency
+        else:
+            recon_currency = company_currency
+
+        debit_recon_values = debit_available_residual_amounts.get(recon_currency)
+        credit_recon_values = credit_available_residual_amounts.get(recon_currency)
+
+        if not debit_recon_values:
+            res["debit_values"] = None
+        if not credit_recon_values:
+            res["credit_values"] = None
+        if res["debit_values"] is None or res["credit_values"] is None:
+            return res
+
+        recon_debit_amount = debit_recon_values["residual"]
+        recon_credit_amount = -credit_recon_values["residual"]
+        min_recon_amount = min(recon_debit_amount, recon_credit_amount)
+
+        exchange_line_mode = (
+            recon_currency == company_currency
+            and debit_currency == credit_currency
+            and (
+                not debit_available_residual_amounts.get(debit_currency)
+                or not credit_available_residual_amounts.get(credit_currency)
+            )
+        )
+
+        (
+            partial_amount,
+            partial_debit_amount_currency,
+            partial_credit_amount_currency,
+        ) = self._prepare_reconciliation_single_partial_amounts(
+            recon_currency,
+            company_currency,
+            debit_values,
+            credit_values,
+            debit_currency,
+            credit_currency,
+            debit_available_residual_amounts,
+            credit_available_residual_amounts,
+            min_recon_amount,
+            exchange_line_mode,
+        )
+
+        res["partial_values"] = {
+            "amount": partial_amount,
+            "debit_amount_currency": partial_debit_amount_currency,
+            "credit_amount_currency": partial_credit_amount_currency,
+            "debit_move_id": debit_aml.id,
+            "credit_move_id": credit_aml.id,
+        }
+
+        debit_values["amount_residual"] -= partial_amount
+        debit_values["amount_residual_currency"] -= partial_debit_amount_currency
+        credit_values["amount_residual"] += partial_amount
+        credit_values["amount_residual_currency"] += partial_credit_amount_currency
+
+        if debit_currency.is_zero(
+            debit_values["amount_residual_currency"]
+        ) and company_currency.is_zero(debit_values["amount_residual"]):
+            res["debit_values"] = None
+        if credit_currency.is_zero(
+            credit_values["amount_residual_currency"]
+        ) and company_currency.is_zero(credit_values["amount_residual"]):
+            res["credit_values"] = None
+        return res
+
+    @api.model
+    def _prepare_reconciliation_amls(self, values_list, shadowed_aml_values=None):
+        """Match debit lines against credit lines, in order, until none are left.
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``AccountMoveLine._prepare_reconciliation_amls``.
+        """
+        debit_values_list = iter(
+            [
+                x
+                for x in values_list
+                if x["aml"]._get_reconciliation_aml_field_value(
+                    "balance", shadowed_aml_values
+                )
+                > 0.0
+                or x["aml"]._get_reconciliation_aml_field_value(
+                    "amount_currency", shadowed_aml_values
+                )
+                > 0.0
+            ]
+        )
+        credit_values_list = iter(
+            [
+                x
+                for x in values_list
+                if x["aml"]._get_reconciliation_aml_field_value(
+                    "balance", shadowed_aml_values
+                )
+                < 0.0
+                or x["aml"]._get_reconciliation_aml_field_value(
+                    "amount_currency", shadowed_aml_values
+                )
+                < 0.0
+            ]
+        )
+        debit_values = None
+        credit_values = None
+        fully_reconciled_aml_ids = set()
+
+        all_results = []
+        while True:
+            if not debit_values:
+                debit_values = next(debit_values_list, None)
+                if not debit_values:
+                    break
+            if not credit_values:
+                credit_values = next(credit_values_list, None)
+                if not credit_values:
+                    break
+
+            results = self._prepare_reconciliation_single_partial(
+                debit_values, credit_values, shadowed_aml_values=shadowed_aml_values
+            )
+            if results.get("partial_values"):
+                all_results.append(results)
+            if results["debit_values"] is None:
+                fully_reconciled_aml_ids.add(debit_values["aml"].id)
+                debit_values = None
+            if results["credit_values"] is None:
+                fully_reconciled_aml_ids.add(credit_values["aml"].id)
+                credit_values = None
+
+        return all_results, fully_reconciled_aml_ids
+
+    @api.model
+    def _prepare_reconciliation_plan(
+        self, plan, amls_values_map, shadowed_aml_values=None
+    ):
+        """Virtually reconcile 'plan', returning every partial's computed values.
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``AccountMoveLine._prepare_reconciliation_plan``.
+        """
+        all_fully_reconciled_aml_ids = set()
+        all_results = []
+
+        def process_amls(amls):
+            remaining_amls = amls.filtered(
+                lambda aml: aml.id not in all_fully_reconciled_aml_ids
+            )
+            if len(remaining_amls.mapped("partner_id")) > 1:
+                remaining_amls = remaining_amls.sorted(
+                    lambda aml: (aml.partner_id and aml.partner_id.id) or False
+                )
+            amls_results, fully_reconciled_aml_ids = self._prepare_reconciliation_amls(
+                [amls_values_map[aml] for aml in remaining_amls],
+                shadowed_aml_values=shadowed_aml_values,
+            )
+            all_fully_reconciled_aml_ids.update(fully_reconciled_aml_ids)
+            all_results.extend(amls_results)
+
+        def process_leaf(plan_node):
+            for child_node in plan_node.get("nodes", []):
+                process_leaf(child_node)
+            process_amls(plan_node["amls"])
+
+        process_leaf(plan)
+        return all_results
+
+    def _check_amls_exigibility_for_reconciliation(self, shadowed_aml_values=None):
+        """Ensure 'self' is eligible to be reconciled together.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._check_amls_exigibility_for_reconciliation``,
+        with two deliberate departures per this issue's Keputusan Desain
+        ("Rekonsiliasi hanya boleh terjadi pada akun ber-reconcile
+        bernilai True, dalam company yang sama, dan hanya untuk item
+        pada entry ber-state posted"):
+
+        - upstream exempts 'asset_cash'/'liability_credit_card' accounts
+          from the 'reconcile' check (its only real use is bank-
+          statement reconciliation, out of this issue's scope -- see the
+          class docstring); that exemption is dropped, so
+          'account_id.reconcile' must be true with no exception.
+        - upstream only rejects a *cancelled* entry
+          ('parent_state == "cancel"'), allowing a draft one through;
+          this issue additionally rejects anything short of 'posted'.
+        """
+        not_reconciled_partial_matching_numbers = set(
+            self.filtered(
+                lambda aml: (
+                    not aml.reconciled
+                    and aml.matching_number
+                    and aml.matching_number.startswith("P")
+                )
+            ).mapped("matching_number")
+        )
+        self = self.filtered(
+            lambda aml: (
+                not aml.reconciled
+                or aml.matching_number not in not_reconciled_partial_matching_numbers
+            )
+        )
+        if not self:
+            return
+
+        if any(aml.reconciled for aml in self):
+            raise UserError(
+                self.env._(
+                    """
+Context: Reconcile journal items
+Problem: Some of the selected journal items are already reconciled
+Solution: Unreconcile them first, or remove them from the selection
+"""
+                )
+            )
+        if any(aml.parent_state != "posted" for aml in self):
+            raise UserError(
+                self.env._(
+                    """
+Context: Reconcile journal items
+Problem: Some of the selected journal items belong to an entry that is
+    not posted
+Solution: Post the journal entry first, then reconcile
+"""
+                )
+            )
+        accounts = self.mapped(
+            lambda x: x._get_reconciliation_aml_field_value(
+                "account_id", shadowed_aml_values
+            )
+        )
+        if len(accounts) > 1:
+            raise UserError(
+                self.env._(
+                    """
+Context: Reconcile journal items
+Problem: The selected journal items are not on the same account:
+    %(accounts)s
+Solution: Select journal items on a single account
+""",
+                    accounts=", ".join(accounts.mapped("display_name")),
+                )
+            )
+        if len(self.company_id.root_id) > 1:
+            raise UserError(
+                self.env._(
+                    """
+Context: Reconcile journal items
+Problem: The selected journal items don't belong to the same company:
+    %(companies)s
+Solution: Select journal items within a single company
+""",
+                    companies=", ".join(self.company_id.mapped("display_name")),
+                )
+            )
+        if not accounts.reconcile:
+            raise UserError(
+                self.env._(
+                    """
+Context: Reconcile journal items
+Problem: Account %(account)s does not allow reconciliation
+Solution: Enable "Allow Reconciliation" on the account first
+""",
+                    account=accounts.display_name,
+                )
+            )
+
+    @api.model
+    def _optimize_reconciliation_plan(
+        self, reconciliation_plan, shadowed_aml_values=None
+    ):
+        """Turn 'reconciliation_plan' into an execution tree, split by currency.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._optimize_reconciliation_plan``, dropping the
+        ``reduced_line_sorting`` context toggle -- an ordering micro-
+        optimisation for very large batches (upstream's own comment);
+        always uses the fuller of its two sort keys.
+        """
+
+        def process_amls(amls):
+            sorted_amls = amls.sorted(
+                key=lambda aml: (
+                    aml._get_reconciliation_aml_field_value(
+                        "date_maturity", shadowed_aml_values
+                    )
+                    or aml._get_reconciliation_aml_field_value(
+                        "date", shadowed_aml_values
+                    ),
+                    aml._get_reconciliation_aml_field_value(
+                        "currency_id", shadowed_aml_values
+                    ),
+                    aml._get_reconciliation_aml_field_value(
+                        "amount_currency", shadowed_aml_values
+                    ),
+                    aml._get_reconciliation_aml_field_value(
+                        "balance", shadowed_aml_values
+                    ),
+                )
+            )
+            currencies = sorted_amls.mapped(
+                lambda x: x._get_reconciliation_aml_field_value(
+                    "currency_id", shadowed_aml_values
+                )
+            )
+            results = {"amls": sorted_amls, "aml_ids": set(sorted_amls.ids)}
+            if len(currencies) != 1:
+                nodes = results["nodes"] = []
+                for currency in currencies:
+                    amls_in_currency = sorted_amls.filtered(
+                        lambda x, currency=currency: (
+                            x._get_reconciliation_aml_field_value(
+                                "currency_id", shadowed_aml_values
+                            )
+                            == currency
+                        )
+                    )
+                    nodes.append(
+                        {
+                            "amls": amls_in_currency,
+                            "aml_ids": set(amls_in_currency.ids),
+                        }
+                    )
+            return results
+
+        def process_children(children):
+            node = {"nodes": [], "aml_ids": set()}
+            for child in children:
+                results = process_leaf(child)
+                if results:
+                    node["nodes"].append(results)
+                    node["aml_ids"].update(results["aml_ids"])
+            node["amls"] = self.browse(node["aml_ids"])
+            return node
+
+        def process_leaf(item):
+            if not item:
+                return None
+            if isinstance(item, models.BaseModel):
+                return process_amls(item)
+            return process_children(item)
+
+        plan_list = []
+        all_aml_ids = set()
+        for item in reconciliation_plan:
+            plan_node = process_leaf(item)
+            if not plan_node or not plan_node.get("amls"):
+                continue
+            amls = plan_node["amls"]
+            amls._check_amls_exigibility_for_reconciliation(
+                shadowed_aml_values=shadowed_aml_values
+            )
+            plan_list.append(plan_node)
+            all_aml_ids.update(plan_node["aml_ids"])
+
+        return plan_list, self.browse(all_aml_ids)
+
+    @api.model
+    def _reconcile_plan(self, reconciliation_plan):
+        """Reconcile 'reconciliation_plan' (see upstream for its shape).
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._reconcile_plan``, adapted to this repo's own
+        ``journal_entry._check_balanced`` signature: unlike the upstream
+        version this issue's Keputusan Desain was written against (a
+        contextmanager wrapping the whole call), the copy already merged
+        into this repo by the journal entry unit is a plain validating
+        method, called once *after* ``_sync_dynamic_lines`` closes --
+        exactly the pattern ``journal_entry.create()``/``write()``
+        already use. Mirrored here rather than reintroducing a second,
+        diverging ``_check_balanced``.
+        """
+        plan_list, all_amls = self._optimize_reconciliation_plan(reconciliation_plan)
+        move_container = {"records": all_amls.move_id}
+        with all_amls.move_id._sync_dynamic_lines(move_container):
+            self._reconcile_plan_with_sync(plan_list, all_amls)
+        all_amls.move_id._check_balanced(move_container)
+
+    def _reconcile_plan_create_full_reconciles(
+        self, plan_list, aml_values_map, all_amls
+    ):
+        """Group every fully-matched batch of lines into a 'reconcile_full'.
+
+        Split out of '_reconcile_plan_with_sync' purely to keep it under
+        this repo's mccabe complexity budget -- a structural, not
+        behavioural, deviation from a literal port (see 'item-format.md'
+        §0/§6). Ported (behaviour-wise) from the "Prepare full reconcile
+        creation" section of upstream
+        ``AccountMoveLine._reconcile_plan_with_sync``, trimmed of its
+        'has_multiple_currencies' branch on residual-zero checks -- this
+        issue's tests are restricted to single-currency reconciliation
+        (see the class docstring), so upstream's own plain
+        'amount_residual_currency' check (its 'else' branch) is kept as
+        the sole rule.
+        """
+
+        def is_line_reconciled(aml):
+            if aml.reconciled:
+                return True
+            if not aml.matched_debit_ids and not aml.matched_credit_ids:
+                return False
+            return aml.currency_id.is_zero(aml.amount_residual_currency)
+
+        full_batches = []
+        all_aml_ids = set()
+        number2lines = all_amls._reconciled_by_number()
+        for plan in plan_list:
+            for aml in plan["amls"]:
+                if "full_batch_index" in aml_values_map[aml]:
+                    continue
+                involved_amls = plan["amls"]._filter_reconciled_by_number(number2lines)
+                all_aml_ids.update(involved_amls.ids)
+                full_batch_index = len(full_batches)
+                is_fully_reconciled = all(
+                    is_line_reconciled(involved_aml) for involved_aml in involved_amls
+                )
+                full_batches.append(
+                    {"amls": involved_amls, "is_fully_reconciled": is_fully_reconciled}
+                )
+                for involved_aml in involved_amls:
+                    if aml_values_map.get(involved_aml):
+                        aml_values_map[involved_aml]["full_batch_index"] = (
+                            full_batch_index
+                        )
+
+        # Upstream re-prefetches 'move_id'/'matched_debit_ids'/
+        # 'matched_credit_ids' here as bare attribute-access statements
+        # (a cache-warmup micro-optimisation); dropped -- this repo's
+        # '.pylintrc'/'.ruff.toml' both enable 'pointless-statement'/B018,
+        # so a bare expression statement fails CI regardless of intent.
+        all_amls = self.browse(list(all_aml_ids))
+
+        full_reconcile_values_list = []
+        for full_batch in full_batches:
+            if not full_batch["is_fully_reconciled"]:
+                continue
+            amls = full_batch["amls"]
+            involved_partials = amls.matched_debit_ids + amls.matched_credit_ids
+            full_reconcile_values_list.append(
+                {
+                    "partial_reconcile_ids": [
+                        Command.link(partial.id) for partial in involved_partials
+                    ],
+                    "reconciled_line_ids": [Command.link(aml.id) for aml in amls],
+                }
+            )
+
+        self.env["reconcile_full"].create(full_reconcile_values_list)
+
+    def _reconcile_plan_with_sync(self, plan_list, all_amls):
+        """Create the 'reconcile_partial'/'reconcile_full' rows for 'plan_list'.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._reconcile_plan_with_sync``, trimmed of
+        everything this issue's Keputusan Desain drops: the invoice-paid
+        pre/post hooks (``_reconcile_pre_hook``/``_reconcile_post_hook``),
+        the whole exchange-difference-move creation stage (partials never
+        carry ``exchange_values`` any more -- see
+        ``_prepare_reconciliation_single_partial``), and the tax-cash-
+        basis stage (no ``tax_exigibility``/cash-basis concept exists
+        anywhere in this repo). Also drops upstream's bare-attribute-access
+        cache-warmup prefetch of 'move_id'/'matched_debit_ids'/
+        'matched_credit_ids' -- see '_reconcile_plan_create_full_reconciles'
+        for why.
+        """
+        aml_values_map = {
+            aml: {
+                "aml": aml,
+                "amount_residual": aml.amount_residual,
+                "amount_residual_currency": aml.amount_residual_currency,
+            }
+            for aml in all_amls
+        }
+
+        partials_values_list = []
+        all_plan_results = []
+        for plan in plan_list:
+            plan_results = self._prepare_reconciliation_plan(plan, aml_values_map)
+            all_plan_results.append(plan_results)
+            for results in plan_results:
+                partials_values_list.append(results["partial_values"])
+
+        partials = self.env["reconcile_partial"].create(partials_values_list)
+        start_range = 0
+        for plan_results, plan in zip(all_plan_results, plan_list, strict=False):
+            size = len(plan_results)
+            plan["partials"] = partials[start_range : start_range + size]
+            start_range += size
+
+        self._reconcile_plan_create_full_reconciles(plan_list, aml_values_map, all_amls)
+
+    def reconcile(self):
+        """Reconcile 'self' (every line in it) all together."""
+        return self._reconcile_plan([self])
+
+    def remove_move_reconcile(self):
+        """Undo a reconciliation: drop every partial matching a line in 'self'."""
+        (self.matched_debit_ids + self.matched_credit_ids).unlink()
+
+    def _reconcile_marked(self):
+        """Reconcile every batch of lines sharing an import-pending matching number.
+
+        Ported (behaviour-wise) from upstream
+        ``AccountMoveLine._reconcile_marked``. Not wired to any button in
+        this issue (no import flow exists yet to produce an
+        'I'-prefixed 'matching_number') -- ported now, per this issue's
+        Keputusan Desain, so a later import unit does not have to
+        re-derive it from scratch.
+        """
+        temp_numbers = list(
+            {
+                line.matching_number
+                for line in self
+                if line.matching_number and line.matching_number.startswith("I")
+            }
+        )
+        if not temp_numbers:
+            return
+        for _matching_number, account, lines in self._read_group(
+            domain=[("matching_number", "in", temp_numbers)],
+            groupby=["matching_number", "account_id"],
+            aggregates=["id:recordset"],
+        ):
+            if all(move.state == "posted" for move in lines.move_id):
+                if not account.reconcile:
+                    _logger.info(
+                        "%s has reconciled lines, changing the config",
+                        account.display_name,
+                    )
+                    account.reconcile = True
+                lines.reconcile()
+
+    def _reconciled_lines(self):
+        """Every reconciled line in 'self', plus their matched counterpart(s).
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``AccountMoveLine._reconciled_lines``. Consumed today by
+        ``journal_entry._compute_has_reconciled_entries``'s guard,
+        forward-declared before this reconciliation unit existed -- see
+        that method's own docstring: it starts reading real data the
+        moment this method exists, no change needed there.
+        """
+        ids = []
+        for aml in self.filtered("reconciled"):
+            ids.extend(
+                [r.debit_move_id.id for r in aml.matched_debit_ids]
+                if aml.credit > 0
+                else [r.credit_move_id.id for r in aml.matched_credit_ids]
+            )
+            ids.append(aml.id)
+        return ids
+
+    def _reconciled_by_number(self) -> dict:
+        """Map every 'matching_number' found in 'self' to all lines sharing it.
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``AccountMoveLine._reconciled_by_number``.
+        """
+        matching_numbers = [n for n in set(self.mapped("matching_number")) if n]
+        if not matching_numbers:
+            return {}
+        return {
+            number: lines.with_env(self.env)
+            for number, lines in self.sudo()._read_group(
+                domain=[("matching_number", "in", matching_numbers)],
+                groupby=["matching_number"],
+                aggregates=["id:recordset"],
+            )
+        }
+
+    def _filter_reconciled_by_number(self, mapping: dict):
+        """Every line matched with a line in 'self', using a pre-built 'mapping'.
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``AccountMoveLine._filter_reconciled_by_number``.
+        """
+        matching_numbers = [
+            n
+            for n in set(self.mapped("matching_number"))
+            if n and not n.startswith("I")
+        ]
+        return self | self.browse(
+            [_id for number in matching_numbers for _id in mapping[number].ids]
+        )
+
+    def _all_reconciled_lines(self):
+        """Every line matched with a line in 'self'."""
+        return self._filter_reconciled_by_number(self._reconciled_by_number())
+
+    def action_reconcile(self):
+        """Reconcile the selected journal items.
+
+        Bound to the "Reconcile" header button of the Journal Items list
+        view (see the class docstring's "UI gelombang pertama" decision
+        -- a multi-select list action, not an OWL widget); operates on
+        whichever records the user selected, exactly like
+        ``account.payment``'s own header ``action_post`` button in
+        upstream Odoo.
+        """
+        self.sudo().reconcile()
+        return True
+
+    def action_remove_move_reconcile(self):
+        """Undo reconciliation for the selected journal items.
+
+        Bound to the "Unreconcile" header button of the Journal Items
+        list view -- see 'action_reconcile'.
+        """
+        self.sudo().remove_move_reconcile()
+        return True

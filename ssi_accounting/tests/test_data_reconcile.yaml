@@ -1,0 +1,1112 @@
+options:
+  auto_refresh: true
+
+scenarios:
+  - name: "Two opposite lines on a reconcilable account fully match"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 1"
+          type: "general"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        values:
+          name: "Receivable 1"
+          account_type: "asset_receivable"
+          code: "REC1AR"
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 1"
+          account_type: "income"
+          code: "REC1INC"
+      - step: "Create and post the debit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 500.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 500.0
+      - step: "Post the debit-side entry"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post the credit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-02
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 0.0
+                credit: 500.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 500.0
+                credit: 0.0
+      - step: "Post the credit-side entry"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find the debit-side receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry1.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line1"
+        limit: 1
+      - step: "Find the credit-side receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry2.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line2"
+        limit: 1
+      - step: "Find both receivable lines as one recordset"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["id", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconcile them"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+      - step: "Assert the debit-side line is fully reconciled"
+        action: "assert"
+        target: "line1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "Assert the credit-side line is fully reconciled"
+        action: "assert"
+        target: "line2"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "Exactly one reconcile_partial was created"
+        action: "search"
+        model: "reconcile_partial"
+        domain:
+          [
+            ["debit_move_id", "=", "REC: line1.id"],
+            ["credit_move_id", "=", "REC: line2.id"],
+          ]
+        save_as: "partial"
+        expect_count: 1
+      - step: "Assert the partial's amount"
+        action: "assert"
+        target: "partial"
+        asserts:
+          amount:
+            type: "value"
+            expected: 500.0
+      - step: "Exactly one reconcile_full was created"
+        action: "search"
+        model: "reconcile_full"
+        domain: [["reconciled_line_ids", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "full"
+        expect_count: 1
+      - step: "Neither line keeps a partial-style 'P' matching number"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["id", "in", ["REC: line1.id", "REC: line2.id"]],
+            ["matching_number", "like", "P%"],
+          ]
+        save_as: "no_p_lines"
+        expect_count: 0
+
+  - name: "Partial reconciliation leaves a residual and a 'P' matching number"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 2"
+          type: "general"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        values:
+          name: "Receivable 2"
+          account_type: "asset_receivable"
+          code: "REC2AR"
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 2"
+          account_type: "income"
+          code: "REC2INC"
+      - step: "Create and post the larger debit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-03
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 700.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 700.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post the smaller credit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-04
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 0.0
+                credit: 300.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 300.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find the debit-side receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry1.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line1"
+        limit: 1
+      - step: "Find the credit-side receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry2.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line2"
+        limit: 1
+      - step: "Find both receivable lines as one recordset"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["id", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconcile them"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+      - step: "Assert the larger line keeps a 400.0 residual"
+        action: "assert"
+        target: "line1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: false
+          amount_residual:
+            type: "value"
+            expected: 400.0
+      - step: "Assert the smaller line is fully consumed"
+        action: "assert"
+        target: "line2"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "No reconcile_full was created (the graph is not fully matched)"
+        action: "search"
+        model: "reconcile_full"
+        domain: [["reconciled_line_ids", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "no_full"
+        expect_count: 0
+      - step: "Both lines carry a 'P' matching number"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["id", "in", ["REC: line1.id", "REC: line2.id"]],
+            ["matching_number", "like", "P%"],
+          ]
+        save_as: "p_lines"
+        expect_count: 2
+
+  - name: "Reconciling two debits against one credit leaves the correct residual"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 3"
+          type: "general"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        values:
+          name: "Receivable 3"
+          account_type: "asset_receivable"
+          code: "REC3AR"
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 3"
+          account_type: "income"
+          code: "REC3INC"
+      - step: "Create and post the first debit entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_d1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-05
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 400.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 400.0
+      - step: "Post it"
+        action: "call"
+        target: "entry_d1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post the second debit entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_d2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-06
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 300.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 300.0
+      - step: "Post it"
+        action: "call"
+        target: "entry_d2"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post the single credit entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_c1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-07
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 0.0
+                credit: 1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 1000.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry_c1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find the first debit line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry_d1.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line_d1"
+        limit: 1
+      - step: "Find the second debit line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry_d2.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line_d2"
+        limit: 1
+      - step: "Find the credit line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry_c1.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line_c1"
+        limit: 1
+      - step: "Find all three receivable lines as one recordset"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["id", "in", ["REC: line_d1.id", "REC: line_d2.id", "REC: line_c1.id"]]]
+        save_as: "ar_lines"
+        expect_count: 3
+      - step: "Reconcile them"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+      - step: "Assert the first debit line is fully consumed"
+        action: "assert"
+        target: "line_d1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "Assert the second debit line is fully consumed"
+        action: "assert"
+        target: "line_d2"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "Assert the credit line keeps a -300.0 residual"
+        action: "assert"
+        target: "line_c1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: false
+          amount_residual:
+            type: "value"
+            expected: -300.0
+      - step: "Two reconcile_partial rows were created"
+        action: "search"
+        model: "reconcile_partial"
+        domain: [["credit_move_id", "=", "REC: line_c1.id"]]
+        save_as: "credit_partials"
+        expect_count: 2
+
+  - name:
+      "Removing a reconciliation restores the residual and clears the matching number"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 4"
+          type: "general"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        values:
+          name: "Receivable 4"
+          account_type: "asset_receivable"
+          code: "REC4AR"
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 4"
+          account_type: "income"
+          code: "REC4INC"
+      - step: "Create and post the debit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-08
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 600.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 600.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post the credit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-09
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 0.0
+                credit: 600.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 600.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find the debit-side receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry1.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line1"
+        limit: 1
+      - step: "Find the credit-side receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry2.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "line2"
+        limit: 1
+      - step: "Find both receivable lines as one recordset"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["id", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconcile them"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+      - step: "Sanity: both lines are reconciled"
+        action: "assert"
+        target: "line1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+      - step: "Remove the reconciliation"
+        action: "call"
+        target: "ar_lines"
+        method: "remove_move_reconcile"
+        as_user: "base.user_admin"
+      - step: "Assert the debit-side residual is restored"
+        action: "assert"
+        target: "line1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: false
+          amount_residual:
+            type: "value"
+            expected: 600.0
+          matching_number:
+            type: "value"
+            operator: "is_falsy"
+      - step: "Assert the credit-side residual is restored"
+        action: "assert"
+        target: "line2"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: false
+          amount_residual:
+            type: "value"
+            expected: -600.0
+          matching_number:
+            type: "value"
+            operator: "is_falsy"
+      - step: "No reconcile_partial survives"
+        action: "search"
+        model: "reconcile_partial"
+        domain:
+          [
+            ["debit_move_id", "=", "REC: line1.id"],
+            ["credit_move_id", "=", "REC: line2.id"],
+          ]
+        save_as: "no_partial"
+        expect_count: 0
+      - step: "No reconcile_full survives"
+        action: "search"
+        model: "reconcile_full"
+        domain: [["reconciled_line_ids", "in", ["REC: line1.id", "REC: line2.id"]]]
+        save_as: "no_full_survives"
+        expect_count: 0
+
+  - name: "Enabling 'Allow Reconciliation' on an account fixes existing items' residual"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 5"
+          type: "general"
+      - step: "Create an account without reconciliation enabled"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_plain"
+        values:
+          name: "Plain Current Asset 5"
+          account_type: "asset_current"
+          code: "REC5AST"
+          reconcile: false
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 5"
+          account_type: "income"
+          code: "REC5INC"
+      - step: "Create and post an entry on the non-reconcilable account"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-10
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_plain.id"
+                debit: 250.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 250.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find its line on the plain account"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry1.id"], ["account_id", "=", "REC: acc_plain.id"]]
+        save_as: "line1"
+        limit: 1
+      - step: "Before enabling reconciliation, residual is zero"
+        action: "assert"
+        target: "line1"
+        refresh: true
+        asserts:
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "Enable 'Allow Reconciliation' on the account"
+        action: "write"
+        target: "acc_plain"
+        as_user: "base.user_admin"
+        values:
+          reconcile: true
+      - step: "The existing item's residual is now repaired"
+        action: "assert"
+        target: "line1"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: false
+          amount_residual:
+            type: "value"
+            expected: 250.0
+
+  - name: "Reconciling an item on a non-reconcilable account is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 6"
+          type: "general"
+      - step: "Create an account without reconciliation enabled"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_plain"
+        values:
+          name: "Plain Current Asset 6"
+          account_type: "asset_current"
+          code: "REC6AST"
+          reconcile: false
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 6"
+          account_type: "income"
+          code: "REC6INC"
+      - step: "Create and post the debit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-11
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_plain.id"
+                debit: 100.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 100.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post the credit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-12
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_plain.id"
+                debit: 0.0
+                credit: 100.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 100.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry2"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Find both lines on the plain account"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["account_id", "=", "REC: acc_plain.id"]]
+        save_as: "plain_lines"
+        expect_count: 2
+      - step: "Reconciling them is rejected"
+        action: "call"
+        target: "plain_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+        expect_error:
+          type: "UserError"
+          message_contains: "does not allow reconciliation"
+
+  - name: "Reconciling items from two different companies is rejected"
+    steps:
+      - step: "Create a journal in the default company"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_a"
+        values:
+          name: "Reconcile Journal 7A"
+          type: "general"
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_b"
+        values:
+          name: "Second Reconcile Company"
+      - step: "Get the admin user"
+        action: "ref"
+        xml_id: "base.user_admin"
+        save_as: "admin_user"
+      - step: "Grant the admin user access to the second company"
+        action: "write"
+        target: "admin_user"
+        values:
+          company_ids: [[4, "REC: company_b.id"]]
+      - step: "Create a journal in the second company"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_b"
+        context:
+          allowed_company_ids: ["REC: company.id", "REC: company_b.id"]
+        values:
+          name: "Reconcile Journal 7B"
+          type: "general"
+          company_id: "REC: company_b.id"
+      - step: "Create a receivable account shared by both companies"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        context:
+          allowed_company_ids: ["REC: company.id", "REC: company_b.id"]
+        values:
+          name: "Shared Receivable 7"
+          account_type: "asset_receivable"
+          company_ids: [[6, 0, ["REC: company.id", "REC: company_b.id"]]]
+          code_mapping_ids:
+            - - 0
+              - 0
+              - company_id: "REC: company.id"
+                code: "REC7AR"
+            - - 0
+              - 0
+              - company_id: "REC: company_b.id"
+                code: "REC7AR"
+      - step: "Create the contra income account for the default company"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income_a"
+        values:
+          name: "Income 7A"
+          account_type: "income"
+          code: "REC7INCA"
+      - step: "Create the contra income account for the second company"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income_b"
+        context:
+          allowed_company_ids: ["REC: company_b.id"]
+        values:
+          name: "Income 7B"
+          account_type: "income"
+          code: "REC7INCB"
+          company_ids: [[6, 0, ["REC: company_b.id"]]]
+      - step: "Create and post the entry in the default company"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_a"
+        values:
+          journal_id: "REC: journal_a.id"
+          date: 2026-05-13
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 100.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income_a.id"
+                debit: 0.0
+                credit: 100.0
+      - step: "Post it"
+        action: "call"
+        target: "entry_a"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post the entry in the second company"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_b"
+        context:
+          allowed_company_ids: ["REC: company.id", "REC: company_b.id"]
+        values:
+          journal_id: "REC: journal_b.id"
+          date: 2026-05-14
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 0.0
+                credit: 100.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income_b.id"
+                debit: 100.0
+                credit: 0.0
+      - step: "Post it"
+        action: "call"
+        target: "entry_b"
+        method: "action_post"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company.id", "REC: company_b.id"]
+      - step: "Find both cross-company lines on the shared account"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["account_id", "=", "REC: acc_ar.id"]]
+        context:
+          allowed_company_ids: ["REC: company.id", "REC: company_b.id"]
+        save_as: "shared_lines"
+        expect_count: 2
+      - step: "Reconciling them is rejected"
+        action: "call"
+        target: "shared_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+        context:
+          allowed_company_ids: ["REC: company.id", "REC: company_b.id"]
+        expect_error:
+          type: "UserError"
+          message_contains: "same company"
+
+  - name: "Reconciling an item still in draft is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 8"
+          type: "general"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        values:
+          name: "Receivable 8"
+          account_type: "asset_receivable"
+          code: "REC8AR"
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 8"
+          account_type: "income"
+          code: "REC8INC"
+      - step: "Create and post the debit-side entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-15
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 100.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 100.0
+      - step: "Post it"
+        action: "call"
+        target: "entry1"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create the credit-side entry, but leave it in draft"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-16
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 0.0
+                credit: 100.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 100.0
+                credit: 0.0
+      - step: "Find both receivable lines"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "ar_lines"
+        expect_count: 2
+      - step: "Reconciling them is rejected"
+        action: "call"
+        target: "ar_lines"
+        method: "reconcile"
+        as_user: "base.user_admin"
+        expect_error:
+          type: "UserError"
+          message_contains: "not posted"
+
+  - name:
+      "Cancel-method reversal auto-reconciles the original and its reversal, both ending
+      with zero residual"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Reconcile Journal 9"
+          type: "general"
+      - step: "Create a reconcilable (receivable) account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_ar"
+        values:
+          name: "Receivable 9"
+          account_type: "asset_receivable"
+          code: "REC9AR"
+      - step: "Create the contra income account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_income"
+        values:
+          name: "Income 9"
+          account_type: "income"
+          code: "REC9INC"
+      - step: "Create and post the original entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-17
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_ar.id"
+                debit: 300.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_income.id"
+                debit: 0.0
+                credit: 300.0
+      - step: "Post it"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create the reversal wizard, method 'cancel'"
+        action: "create"
+        model: "journal_entry_reversal"
+        save_as: "wizard"
+        values:
+          move_ids:
+            - - 6
+              - 0
+              - - "REC: entry.id"
+          date: 2026-05-18
+          refund_method: "cancel"
+      - step: "Confirm the reversal"
+        action: "call"
+        target: "wizard"
+        method: "action_reverse_moves"
+        as_user: "base.user_admin"
+      - step: "Find the reversal entry"
+        action: "search"
+        model: "journal_entry"
+        domain: [["reversed_entry_id", "=", "REC: entry.id"]]
+        save_as: "reversal"
+        expect_count: 1
+      - step: "Find the original entry's receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "orig_line"
+        limit: 1
+      - step: "Find the reversal entry's receivable line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: reversal.id"], ["account_id", "=", "REC: acc_ar.id"]]
+        save_as: "rev_line"
+        limit: 1
+      - step: "Assert the original entry's line has zero residual"
+        action: "assert"
+        target: "orig_line"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0
+      - step: "Assert the reversal entry's line has zero residual"
+        action: "assert"
+        target: "rev_line"
+        refresh: true
+        asserts:
+          reconciled:
+            type: "value"
+            expected: true
+          amount_residual:
+            type: "value"
+            expected: 0.0

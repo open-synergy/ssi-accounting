@@ -26,6 +26,7 @@
         "security/ir_rule/journal.xml",
         "security/ir_rule/journal_group.xml",
         "security/ir_rule/journal_entry.xml",
+        "security/ir_rule/reconcile.xml",
         "security/ir_rule/tax.xml",
         "security/ir_rule/tax_group.xml",
         "menu.xml",
