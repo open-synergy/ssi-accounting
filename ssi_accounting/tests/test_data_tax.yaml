@@ -1,0 +1,400 @@
+scenarios:
+  - name: "Create a 11% percent tax generates base and reverse repartition lines"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "VAT Group"
+      - step: "Create the tax"
+        action: "create"
+        model: "tax"
+        save_as: "tax11"
+        values:
+          name: "VAT 11%"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: group.id"
+      - step: "Assert default type_tax_use is none"
+        action: "assert"
+        target: "tax11"
+        asserts:
+          type_tax_use:
+            type: "value"
+            expected: "none"
+      - step: "Assert two base repartition lines were generated"
+        action: "assert"
+        target: "tax11"
+        asserts:
+          repartition_line_base_ids:
+            type: "o2m"
+            check: "count"
+            expected_count: 2
+      - step: "Assert two reverse repartition lines were generated"
+        action: "assert"
+        target: "tax11"
+        asserts:
+          repartition_line_reverse_ids:
+            type: "o2m"
+            check: "count"
+            expected_count: 2
+      - step: "Assert base and reverse lines add up to the technical field"
+        action: "assert"
+        target: "tax11"
+        asserts:
+          repartition_line_ids:
+            type: "o2m"
+            check: "count"
+            expected_count: 4
+
+  - name: "Edit tax name"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Edit Tax Group"
+      - step: "Create the tax"
+        action: "create"
+        model: "tax"
+        save_as: "tax_edit"
+        values:
+          name: "Original Name"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Write new name"
+        action: "write"
+        target: "tax_edit"
+        values:
+          name: "Updated Name"
+      - step: "Assert name updated"
+        action: "assert"
+        target: "tax_edit"
+        asserts:
+          name:
+            type: "value"
+            expected: "Updated Name"
+
+  - name: "Delete a tax"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Delete Tax Group"
+      - step: "Create the tax"
+        action: "create"
+        model: "tax"
+        save_as: "tax_delete"
+        values:
+          name: "Disposable Tax"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Delete the tax"
+        action: "unlink"
+        target: "tax_delete"
+      - step: "Verify deleted"
+        action: "search"
+        model: "tax"
+        domain: [["name", "=", "Disposable Tax"]]
+        save_as: "result"
+        expect_count: 0
+
+  - name: "Group of taxes aggregates two percent child taxes"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Children Tax Group"
+      - step: "Create first child tax"
+        action: "create"
+        model: "tax"
+        save_as: "child_a"
+        values:
+          name: "Child A 5%"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Create second child tax"
+        action: "create"
+        model: "tax"
+        save_as: "child_b"
+        values:
+          name: "Child B 6%"
+          amount_type: "percent"
+          amount: 6.0
+          tax_group_id: "REC: group.id"
+      - step: "Create the group tax with both children"
+        action: "create"
+        model: "tax"
+        save_as: "group_tax"
+        values:
+          name: "Combined Tax"
+          amount_type: "group"
+          tax_group_id: "REC: group.id"
+          children_tax_ids: [[6, 0, ["REC: child_a.id", "REC: child_b.id"]]]
+      - step: "Assert both children are set"
+        action: "assert"
+        target: "group_tax"
+        asserts:
+          children_tax_ids:
+            type: "m2m"
+            check: "exact"
+            expected_records:
+              - "REC: child_a"
+              - "REC: child_b"
+
+  - name: "price_include follows price_include_override"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Price Include Group"
+      - step: "Create tax with no override"
+        action: "create"
+        model: "tax"
+        save_as: "tax_no_override"
+        values:
+          name: "No Override"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Assert price_include follows the company default (tax excluded)"
+        action: "assert"
+        target: "tax_no_override"
+        asserts:
+          price_include:
+            type: "value"
+            expected: false
+      - step: "Create tax with tax_included override"
+        action: "create"
+        model: "tax"
+        save_as: "tax_included"
+        values:
+          name: "Included"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+          price_include_override: "tax_included"
+      - step: "Assert price_include is true"
+        action: "assert"
+        target: "tax_included"
+        asserts:
+          price_include:
+            type: "value"
+            expected: true
+
+  - name: "has_negative_factor reflects a negative tax repartition line"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Negative Factor Group"
+      - step: "Create tax with only positive factors"
+        action: "create"
+        model: "tax"
+        save_as: "tax_positive"
+        values:
+          name: "Positive Only"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Assert has_negative_factor is false"
+        action: "assert"
+        target: "tax_positive"
+        asserts:
+          has_negative_factor:
+            type: "value"
+            expected: false
+      - step: "Create tax with an explicit negative-factor base distribution"
+        action: "create"
+        model: "tax"
+        save_as: "tax_negative"
+        values:
+          name: "Reverse Charge"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+          repartition_line_base_ids:
+            - - 0
+              - 0
+              - repartition_type: "tax"
+                document_type: "base"
+                factor_percent: 120
+            - - 0
+              - 0
+              - repartition_type: "tax"
+                document_type: "base"
+                factor_percent: -20
+      - step: "Assert has_negative_factor is true"
+        action: "assert"
+        target: "tax_negative"
+        asserts:
+          has_negative_factor:
+            type: "value"
+            expected: true
+
+  - name: "is_used is always false while account.move.line does not exist"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Is Used Group"
+      - step: "Create the tax"
+        action: "create"
+        model: "tax"
+        save_as: "tax_unused"
+        values:
+          name: "Unused Tax"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Assert is_used is false"
+        action: "assert"
+        target: "tax_unused"
+        asserts:
+          is_used:
+            type: "value"
+            expected: false
+
+  - name: "Onchange repartition_type to base clears account_id"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Onchange Group"
+      - step: "Create an account for the repartition line"
+        action: "create"
+        model: "account.account"
+        save_as: "generic_account"
+        values:
+          name: "Tax Account"
+          code: "TAXACC1"
+          account_type: "income"
+      - step: "Create a tax to own the repartition line"
+        action: "create"
+        model: "tax"
+        save_as: "onchange_tax"
+        values:
+          name: "Onchange Tax"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Fill a repartition line then switch to base to clear account_id"
+        action: "form"
+        model: "tax.repartition_line"
+        save: false
+        ops:
+          - set: {tax_id: "REC: onchange_tax"}
+          - set: {repartition_type: "tax"}
+          - set: {account_id: "REC: generic_account"}
+          - set: {repartition_type: "base"}
+          - assert:
+              account_id:
+                type: "value"
+                operator: "is_falsy"
+
+  - name: "Total factor different from 100 percent is rejected"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Bad Factor Group"
+      - step: "Create the tax"
+        action: "create"
+        model: "tax"
+        save_as: "tax_bad_factor"
+        values:
+          name: "Bad Factor Tax"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Search the base tax-type repartition line"
+        action: "search"
+        model: "tax.repartition_line"
+        domain:
+          [
+            ["tax_id", "=", "REC: tax_bad_factor.id"],
+            ["document_type", "=", "base"],
+            ["repartition_type", "=", "tax"],
+          ]
+        save_as: "base_tax_line"
+        limit: 1
+      - step: "Changing its factor away from 100 is rejected"
+        action: "write"
+        target: "base_tax_line"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "100"
+        values:
+          factor_percent: 40.0
+
+  - name: "Repartition line account from a different company is rejected"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Cross Company Group"
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_b"
+        values:
+          name: "Second Company"
+      - step: "Create an account belonging only to the second company"
+        action: "create"
+        model: "account.account"
+        save_as: "foreign_account"
+        context:
+          allowed_company_ids: ["REC: company_b.id"]
+        values:
+          name: "Foreign Account"
+          code: "FOREIGN1"
+          account_type: "income"
+          company_ids: [[6, 0, ["REC: company_b.id"]]]
+      - step: "Create the tax under the default company"
+        action: "create"
+        model: "tax"
+        save_as: "tax_cross_company"
+        values:
+          name: "Cross Company Tax"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: group.id"
+      - step: "Search the base tax-type repartition line"
+        action: "search"
+        model: "tax.repartition_line"
+        domain:
+          [
+            ["tax_id", "=", "REC: tax_cross_company.id"],
+            ["document_type", "=", "base"],
+            ["repartition_type", "=", "tax"],
+          ]
+        save_as: "cross_company_line"
+        limit: 1
+      - step: "Assigning the foreign account is rejected"
+        action: "write"
+        target: "cross_company_line"
+        expect_error:
+          type: "UserError"
+        values:
+          account_id: "REC: foreign_account.id"

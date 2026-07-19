@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="tax_view_search" model="ir.ui.view">
+        <field name="name">tax - search</field>
+        <field name="model">tax</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" />
+                <field name="tax_group_id" />
+                <field name="company_id" />
+                <filter
+                    name="filter_sale"
+                    string="Sales"
+                    domain="[('type_tax_use', '=', 'sale')]"
+                />
+                <filter
+                    name="filter_purchase"
+                    string="Purchases"
+                    domain="[('type_tax_use', '=', 'purchase')]"
+                />
+                <separator />
+                <filter
+                    name="filter_inactive"
+                    string="Inactive Taxes"
+                    domain="[('active', '=', False)]"
+                />
+                <!-- Group By -->
+                <group>
+                    <filter
+                        name="group_by_tax_group"
+                        string="Tax Group"
+                        context="{'group_by': 'tax_group_id'}"
+                    />
+                    <filter
+                        name="group_by_type_tax_use"
+                        string="Tax Type"
+                        context="{'group_by': 'type_tax_use'}"
+                    />
+                    <filter
+                        name="group_by_company"
+                        string="Company"
+                        context="{'group_by': 'company_id'}"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="tax_view_list" model="ir.ui.view">
+        <field name="name">tax - list</field>
+        <field name="model">tax</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="tax_group_id" />
+                <field name="type_tax_use" />
+                <field name="amount_type" />
+                <field name="amount" />
+                <field name="active" optional="hide" widget="boolean_toggle" />
+                <field name="company_id" groups="base.group_multi_company" />
+            </list>
+        </field>
+    </record>
+
+    <record id="tax_view_form" model="ir.ui.view">
+        <field name="name">tax - form</field>
+        <field name="model">tax</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group name="main_group">
+                        <group name="main_group_left">
+                            <field name="name" />
+                            <field name="tax_group_id" />
+                            <field name="type_tax_use" />
+                        </group>
+                        <group name="main_group_right">
+                            <field name="amount_type" />
+                            <field name="amount" invisible="amount_type == 'group'" />
+                            <field
+                                name="children_tax_ids"
+                                widget="many2many_tags"
+                                invisible="amount_type != 'group'"
+                            />
+                            <field name="active" widget="boolean_toggle" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="base_distribution" string="Base Distribution">
+                            <field name="repartition_line_base_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="repartition_type" />
+                                    <field name="factor_percent" />
+                                    <field
+                                        name="account_id"
+                                        invisible="repartition_type == 'base'"
+                                    />
+                                    <field
+                                        name="tag_ids"
+                                        widget="many2many_tags"
+                                        domain="tag_ids_domain"
+                                    />
+                                </list>
+                            </field>
+                        </page>
+                        <page name="reverse_distribution" string="Reverse Distribution">
+                            <field name="repartition_line_reverse_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="repartition_type" />
+                                    <field name="factor_percent" />
+                                    <field
+                                        name="account_id"
+                                        invisible="repartition_type == 'base'"
+                                    />
+                                    <field
+                                        name="tag_ids"
+                                        widget="many2many_tags"
+                                        domain="tag_ids_domain"
+                                    />
+                                </list>
+                            </field>
+                        </page>
+                        <page name="advanced_options" string="Advanced Options">
+                            <group name="advanced_options_group">
+                                <group name="advanced_options_left">
+                                    <field name="label" />
+                                    <field name="description" />
+                                    <field name="sequence" />
+                                    <field name="country_id" />
+                                </group>
+                                <group name="advanced_options_right">
+                                    <field name="price_include_override" />
+                                    <field name="price_include" readonly="1" />
+                                    <field name="include_base_amount" />
+                                    <field name="is_base_affected" />
+                                    <field
+                                        name="company_id"
+                                        groups="base.group_multi_company"
+                                    />
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter />
+            </form>
+        </field>
+    </record>
+
+    <record id="tax_action" model="ir.actions.act_window">
+        <field name="name">Taxes</field>
+        <field name="res_model">tax</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem
+        id="tax_menu"
+        parent="menu_accounting_configuration"
+        action="tax_action"
+        sequence="45"
+    />
+</odoo>

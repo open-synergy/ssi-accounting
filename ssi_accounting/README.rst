@@ -15,8 +15,10 @@ chart-of-accounts support models (``account.root``, ``account.group``,
 ``account.tag``), phase-1 accounting configuration on ``res.company``, a
 deactivation guard on ``res.currency``, and the chart of accounts itself:
 ``account.account`` (Odoo 19 style multi-company, with a Chart of Accounts menu)
-and its companion ``account.code.mapping``. Journals, taxes, and journal entries
-are added incrementally by later units.
+and its companion ``account.code.mapping``. It also has ``account.journal``/
+``account.journal.group``, and the tax configuration models ``tax_group``,
+``tax`` and its child ``tax.repartition_line``. Journal entries and the tax
+computation engine are added incrementally by later units.
 
 
 Design decisions
@@ -32,9 +34,9 @@ Design decisions
   - ``group_accounting_user`` — implies ``base.group_user``. Accountants need this
     group to create and post journal entries.
   - ``group_accounting_manager`` — implies ``group_accounting_user``. Grants full
-    access to the chart-of-accounts configuration models added in this unit
-    (``account.group``, ``account.tag``), and will keep doing so for journals and
-    taxes once those models exist.
+    access to the accounting configuration models: ``account.group``,
+    ``account.tag``, ``account.journal``, ``account.journal.group``,
+    ``tax_group``, ``tax`` (and its child ``tax.repartition_line``).
 
   Both groups belong to the ``Accounting`` module category.
 * ``account.root``, ``account.group`` are ported (behaviour-wise) from Odoo core's
@@ -68,19 +70,21 @@ Design decisions
   JSONB lookup. ``account.code.mapping`` (the "Mapping" tab on the account form) is
   ported alongside it, unchanged from upstream apart from pointing at this module's
   own ``account.account``.
-* ``account.account`` does **not** yet have ``tax_ids``: a Many2many field needs a
-  real comodel at registry-build time, so it must wait for the tax configuration
-  unit to add it back via inheritance. ``_onchange_account_type`` (whose only job
-  upstream is clearing ``tax_ids``) and ``related_taxes_amount``/
-  ``action_open_related_taxes`` are kept but guarded on field/model presence, so
-  they start working automatically once the tax unit lands.
+* ``account.account`` still does **not** have ``tax_ids``: a Many2many field
+  needs a real comodel at registry-build time, so it must wait for a later unit
+  to add it back via inheritance. ``_onchange_account_type`` (whose only job
+  upstream is clearing ``tax_ids``) stays guarded on ``"tax_ids" in
+  self._fields`` for that reason. ``related_taxes_amount``/
+  ``action_open_related_taxes`` only needed the ``tax`` model itself (not
+  ``tax_ids``) and now work for real, now that ``tax`` exists.
 * Several ``account.account`` constraints/computes are guarded no-ops until later
   units land, exactly like ``account.group``/``res.currency`` above: ``used``,
   ``current_balance``, the reconcile-toggle guards, and the delete guard on
   ``account.move.line`` (journal items — lands with ``journal_entry``); the
   journal/account currency-mismatch check on ``account.journal`` (lands with
-  ``journal``); the delete guard on ``tax.repartition.line`` (lands with the tax
-  units). Dropped entirely (out of this issue's scope): the opening balance
+  ``journal``). The delete guard on ``tax.repartition_line`` now works for real,
+  now that model exists (see below). Dropped entirely (out of this issue's
+  scope): the opening balance
   triplet, ``non_trade``, the partner-frequency heuristics behind the invoice line
   account widget, ``name_create``, ``get_import_templates``, and the whole
   merge/unmerge suite.
@@ -101,6 +105,44 @@ Design decisions
   specifically blocks **deactivation**. It reads ``account.move.line``, which does
   not exist yet in this repo's scope, so the guard is a no-op (deactivation always
   succeeds) until that model is added alongside ``journal``.
+* ``tax_group``, ``tax`` and its child ``tax.repartition_line`` are ported
+  (behaviour-wise) from Odoo core's ``account.tax.group``/``account.tax``/
+  ``account.tax.repartition.line``, because those models live inside the
+  ``account`` module, which ``ssi_accounting`` must not depend on. This unit is
+  **configuration only** — no ``compute_all``/tax-computation engine, no
+  synchronisation of tax lines on a journal entry, and no fiscal
+  position/cash basis/tax closing/tax report; those are separate, later units.
+* Upstream's invoice-flavoured vocabulary is neutralised throughout, per this
+  unit's binding design decision: ``invoice_repartition_line_ids`` →
+  ``repartition_line_base_ids``, ``refund_repartition_line_ids`` →
+  ``repartition_line_reverse_ids``, ``document_type`` values ``invoice``/
+  ``refund`` → ``base``/``reverse``, ``invoice_label`` → ``label``. The
+  base/reverse split itself is kept (not collapsed into one list), because a
+  journal entry can be reversed and the reversal must use the oppositely
+  signed repartition group.
+* ``tax.type_tax_use`` defaults to ``none`` (upstream defaults to ``sale``):
+  this repo has no sale/purchase documents to filter a tax selector by.
+* When a tax is created, two ``base`` repartition lines (one
+  ``repartition_type="base"``, one ``repartition_type="tax"``) and two
+  ``reverse`` lines following the same pattern are generated automatically,
+  each group totalling a 100% factor — enforced by a constraint raising an
+  SSI-formatted ``ValidationError`` when violated.
+* ``tax.repartition_line`` is a pure child of ``tax`` (``ondelete="cascade"``):
+  it gets no group, menu, standalone view, or ``ir.rule`` of its own — its
+  ``ir.model.access`` rows are written together with ``tax``'s own rows, and
+  it is only ever reached through ``tax.repartition_line_base_ids``/
+  ``repartition_line_reverse_ids``.
+* Dropped entirely from upstream's ``account.tax`` (out of this issue's
+  scope): ``fiscal_position_ids``/``original_tax_ids``/``replacing_tax_ids``/
+  ``is_domestic`` (fiscal position), ``tax_exigibility``/
+  ``cash_basis_transition_account_id`` (cash basis), ``analytic`` (no
+  analytic accounting concept yet), ``tax_scope`` (no goods/services product
+  distinction here), ``invoice_legal_notes`` (no invoice document),
+  ``repartition_lines_str`` (chatter-tracking helper, out of scope).
+  Dropped from ``account.tax.group``: ``advance_tax_payment_account_id``
+  (tax closing entry, out of scope), ``pos_receipt_label`` (no Point of Sale
+  integration). Dropped from ``account.tax.repartition.line``:
+  ``use_in_tax_closing`` (same reason as ``advance_tax_payment_account_id``).
 
 
 Installation

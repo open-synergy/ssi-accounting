@@ -13,5 +13,8 @@ from . import (
     mixin_sequence_number,
     res_company,
     res_currency,
+    tax,
+    tax_group,
+    tax_repartition_line,
     test_mixin_sequence_number,
 )
