@@ -2,6 +2,8 @@
 # Copyright 2026 PT. Simetri Sinergi Indonesia
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
+from . import test_account
+from . import test_account_code_mapping
 from . import test_account_group
 from . import test_account_root
 from . import test_account_tag

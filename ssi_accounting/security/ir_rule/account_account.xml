@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Multi-company isolation for the company_ids Many2many: an account
+         is visible if any of the allowed companies is a parent of (or is)
+         one of the account's companies. Mirrors Odoo core's own rule for
+         account.account (domain_force uses the same 'parent_of' shape).
+         No `groups` field on purpose -> applies to every user. -->
+    <record id="account_account_multi_company_rule" model="ir.rule">
+        <field name="name">Account - Multi Company</field>
+        <field name="model_id" ref="model_account_account" />
+        <field name="domain_force">[('company_ids', 'parent_of', company_ids)]</field>
+    </record>
+</odoo>

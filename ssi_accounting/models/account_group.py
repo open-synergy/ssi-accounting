@@ -2,8 +2,11 @@
 # Copyright 2026 PT. Simetri Sinergi Indonesia
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
+from collections import defaultdict
+
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
+from odoo.tools import SQL
 
 
 class AccountGroup(models.Model):
@@ -16,11 +19,15 @@ class AccountGroup(models.Model):
 
     ``_adapt_accounts_for_account_groups`` is the method that keeps
     ``account.account.group_id`` in sync with the group hierarchy whenever
-    a group's code prefix range changes. The ``account`` model itself is
-    out of scope for this unit (it lands in a later one), so the method
-    guards for its absence and is a no-op until then -- it starts doing
-    real work the moment ``account.account`` is registered, with no
-    further change needed here.
+    a group's code prefix range changes. The ``account.account`` model was
+    out of scope for this unit and landed in a later one (see
+    ``models/account.py``); this method was originally guarded as a no-op
+    for its absence and has since been adjusted to loop per company and
+    read ``code`` through the ORM, because the landed ``account.account``
+    turned out to be Odoo 19 style multi-company (``company_ids``
+    Many2many, ``code`` backed by a ``company_dependent`` column) rather
+    than a plain single-``company_id`` model -- see that method's own
+    docstring for the detail.
     """
 
     _name = "account.group"
@@ -239,49 +246,68 @@ Solution: Pick a parent group that is not one of this group's own
         account: the one with the longest prefixes whose range contains
         the account's code. No-op while ``account.account`` is not
         registered yet -- see the class docstring.
+
+        ``account.account`` uses Odoo 19 style multi-company: there is no
+        plain ``company_id`` column, only a ``company_ids`` Many2many, and
+        ``code`` is a compute field backed by the ``code_store``
+        ``company_dependent`` column (see that model's docstring) -- not a
+        real, directly queryable SQL column. So this loops per company
+        (``account.group.company_id`` is single-company) and reads ``code``
+        through the ORM with ``with_company()``, which resolves the correct
+        per-company value; only the group-matching itself (prefix-range
+        lookup) stays a single SQL statement per company for performance.
         """
         if "account.account" not in self.env:
             return
-        company_ids = account_ids.company_id.ids if account_ids else self.company_id.ids
-        account_ids = account_ids.ids if account_ids else []
-        if not company_ids and not account_ids:
+        companies = account_ids.company_ids if account_ids else self.company_id
+        if not companies:
             return
         self.env["account.group"].flush_model()
         self.env["account.account"].flush_model()
 
-        account_where_clause = ""
-        where_params = [tuple(company_ids)]
-        if account_ids:
-            account_where_clause = "AND account.id IN %s"
-            where_params.append(tuple(account_ids))
+        account_model = self.env["account.account"]
+        for company in companies:
+            domain = [("company_ids", "in", [company.id])]
+            if account_ids:
+                domain.append(("id", "in", account_ids.ids))
+            accounts = account_model.with_company(company).search(domain)
+            accounts_with_code = accounts.filtered(lambda a: a.code)
+            if not accounts_with_code:
+                continue
 
-        self._cr.execute(
-            f"""
-            WITH candidates_account_groups AS (
-                SELECT
-                    account.id AS account_id,
-                    ARRAY_AGG(
-                        agroup.id
-                        ORDER BY char_length(agroup.code_prefix_start) DESC,
-                                 agroup.id
-                    ) AS group_ids
-                FROM account_account account
-                LEFT JOIN account_group agroup
-                    ON agroup.code_prefix_start
-                       <= LEFT(account.code, char_length(agroup.code_prefix_start))
-                    AND agroup.code_prefix_end
-                        >= LEFT(account.code, char_length(agroup.code_prefix_end))
-                    AND agroup.company_id = account.company_id
-                WHERE account.company_id IN %s {account_where_clause}
-                GROUP BY account.id
+            codes = accounts_with_code.mapped("code")
+            account_code_values = SQL(",".join(["(%s)"] * len(codes)), *codes)
+            results = self.env.execute_query(
+                SQL(
+                    """
+                         SELECT DISTINCT ON (account_code.code)
+                                account_code.code,
+                                agroup.id AS group_id
+                           FROM (VALUES %(account_code_values)s)
+                                AS account_code (code)
+                      LEFT JOIN account_group agroup
+                             ON agroup.code_prefix_start
+                                <= LEFT(account_code.code, %(start_len)s)
+                            AND agroup.code_prefix_end
+                                >= LEFT(account_code.code, %(end_len)s)
+                            AND agroup.company_id = %(company_id)s
+                       ORDER BY account_code.code, %(start_len)s DESC, agroup.id
+                    """,
+                    account_code_values=account_code_values,
+                    start_len=SQL("char_length(agroup.code_prefix_start)"),
+                    end_len=SQL("char_length(agroup.code_prefix_end)"),
+                    company_id=company.id,
+                )
             )
-            UPDATE account_account
-            SET group_id = rel.group_ids[1]
-            FROM candidates_account_groups rel
-            WHERE account_account.id = rel.account_id
-            """,
-            where_params,
-        )
+            group_by_code = dict(results)
+            accounts_by_group = defaultdict(list)
+            for account in accounts_with_code:
+                accounts_by_group[group_by_code.get(account.code)].append(account.id)
+            for group_id, ids in accounts_by_group.items():
+                self.env.cr.execute(
+                    "UPDATE account_account SET group_id = %s WHERE id IN %s",
+                    (group_id, tuple(ids)),
+                )
         self.env["account.account"].invalidate_model(["group_id"])
 
     def _adapt_parent_account_group(self):
