@@ -764,13 +764,22 @@ scenarios:
           amount_type: "percent"
           amount: 11.0
           tax_group_id: "REC: vat_group.id"
-      - step: "Create a journal"
+      - step: "Create the suspense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_suspense"
+        values:
+          name: "Suspense Account 8"
+          account_type: "asset_current"
+          code: "TS8003"
+      - step: "Create a journal with a suspense account (auto-balances drafts)"
         action: "create"
         model: "account.journal"
         save_as: "journal"
         values:
           name: "Tax Sync Journal 8"
           type: "general"
+          suspense_account_id: "REC: acc_suspense.id"
       - step: "Create the expense account"
         action: "create"
         model: "account.account"
@@ -813,17 +822,9 @@ scenarios:
         domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
         save_as: "tax_line"
         limit: 1
-      - step: "Find the payable (credit) line"
-        action: "search"
-        model: "journal_entry.item"
-        domain:
-          [
-            ["move_id", "=", "REC: entry.id"],
-            ["account_id", "=", "REC: acc_payable.id"],
-          ]
-        save_as: "credit_line"
-        limit: 1
-      - step: "Manually override the tax line's amount, rebalancing the credit line"
+      - step:
+          "Manually override the tax line's amount -- the journal's suspense account
+          absorbs the resulting imbalance, no other line needs touching"
         action: "write"
         target: "entry"
         values:
@@ -832,9 +833,6 @@ scenarios:
               - "REC: tax_line.id"
               - balance: 150000.0
                 amount_currency: 150000.0
-            - - 1
-              - "REC: credit_line.id"
-              - balance: -1150000.0
       - step: "Write an unrelated header field, forcing another sync pass"
         action: "write"
         target: "entry"
