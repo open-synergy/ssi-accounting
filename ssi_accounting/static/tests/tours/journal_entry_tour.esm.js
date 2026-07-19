@@ -68,6 +68,15 @@ registry.category("web_tour.tours").add("ssi_accounting_journal_entry_create", {
             run: "click",
         },
         {
+            // 'date' has a default (today), so 'web.DateTimeField' renders it as a
+            // BUTTON, not an input, until the field takes focus -- the template
+            // only emits <input> when the field is empty or already active.
+            // Clicking the button focuses it, which swaps it for the real input.
+            content: "Open the Date field for editing",
+            trigger: ".o_field_widget[name='date'] .o_daterange_start",
+            run: "click",
+        },
+        {
             content: "Set the Date",
             trigger: ".o_field_widget[name='date'] input",
             run: "edit 03/10/2026 && press Escape",
