@@ -60,7 +60,6 @@ class ReconcilePartial(models.Model):
     )
     full_reconcile_id = fields.Many2one(
         comodel_name="reconcile_full",
-        string="Full Reconcile",
         copy=False,
         index=True,
         ondelete="cascade",
@@ -80,7 +79,6 @@ class ReconcilePartial(models.Model):
     )
     company_currency_id = fields.Many2one(
         comodel_name="res.currency",
-        string="Company Currency",
         compute="_compute_currencies",
         store=True,
         precompute=True,
@@ -90,7 +88,6 @@ class ReconcilePartial(models.Model):
     )
     debit_currency_id = fields.Many2one(
         comodel_name="res.currency",
-        string="Debit Currency",
         compute="_compute_currencies",
         store=True,
         precompute=True,
@@ -100,7 +97,6 @@ class ReconcilePartial(models.Model):
     )
     credit_currency_id = fields.Many2one(
         comodel_name="res.currency",
-        string="Credit Currency",
         compute="_compute_currencies",
         store=True,
         precompute=True,

@@ -104,12 +104,6 @@
                         invisible="state not in ('draft', 'posted')"
                         confirm="Are you sure you want to cancel this journal entry?"
                     />
-                    <button
-                        name="action_reverse"
-                        string="Reverse Entry"
-                        type="object"
-                        invisible="state != 'posted'"
-                    />
                     <field name="state" widget="statusbar" />
                 </header>
                 <sheet>

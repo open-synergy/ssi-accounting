@@ -102,7 +102,6 @@ class AccountJournal(models.Model):
         help="Used to order journals in lists.",
     )
     company_id = fields.Many2one(
-        string="Company",
         comodel_name="res.company",
         required=True,
         index=True,
@@ -111,13 +110,11 @@ class AccountJournal(models.Model):
     )
     currency_id = fields.Many2one(
         comodel_name="res.currency",
-        string="Currency",
         help="Forces all journal entries of this journal to use a "
         "specific currency. Leave empty to allow any currency.",
     )
     default_account_id = fields.Many2one(
         comodel_name="account.account",
-        string="Default Account",
         check_company=True,
         copy=False,
         help="Account used as the counterpart when a journal entry line "
@@ -131,7 +128,6 @@ class AccountJournal(models.Model):
     )
     suspense_account_id = fields.Many2one(
         comodel_name="account.account",
-        string="Suspense Account",
         check_company=True,
         default=lambda self: self.env.company.account_journal_suspense_account_id,
         help="Account used to post amounts that cannot be immediately "

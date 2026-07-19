@@ -44,14 +44,12 @@ class TaxGroup(models.Model):
         help="Used to order tax groups in lists.",
     )
     company_id = fields.Many2one(
-        string="Company",
         comodel_name="res.company",
         required=True,
         default=lambda self: self.env.company,
         help="Company that owns this tax group.",
     )
     country_id = fields.Many2one(
-        string="Country",
         comodel_name="res.country",
         help="Country this tax group applies to, if relevant for reporting.",
     )
@@ -67,14 +65,12 @@ class TaxGroup(models.Model):
     )
     tax_payable_account_id = fields.Many2one(
         comodel_name="account.account",
-        string="Tax Payable Account",
         check_company=True,
         help="Tax current account used as a counterpart to the Tax Closing "
         "Entry when in favor of the tax authorities.",
     )
     tax_receivable_account_id = fields.Many2one(
         comodel_name="account.account",
-        string="Tax Receivable Account",
         check_company=True,
         help="Tax current account used as a counterpart to the Tax Closing "
         "Entry when in favor of the company.",

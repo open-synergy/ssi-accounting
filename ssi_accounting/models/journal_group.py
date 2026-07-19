@@ -37,7 +37,6 @@ class AccountJournalGroup(models.Model):
         "group in the journal list and in reports.",
     )
     company_id = fields.Many2one(
-        string="Company",
         comodel_name="res.company",
         required=True,
         default=lambda self: self.env.company,

@@ -80,7 +80,6 @@ class TaxRepartitionLine(models.Model):
     )
     account_id = fields.Many2one(
         comodel_name="account.account",
-        string="Account",
         domain="[('account_type', 'not in', "
         "('asset_receivable', 'liability_payable', 'off_balance'))]",
         check_company=True,

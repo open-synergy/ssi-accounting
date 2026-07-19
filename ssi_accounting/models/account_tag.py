@@ -57,7 +57,6 @@ class AccountTag(models.Model):
         help="Set active to false to hide the account tag without removing it.",
     )
     country_id = fields.Many2one(
-        string="Country",
         comodel_name="res.country",
         help="Country for which this tag is available, when applied on taxes.",
     )

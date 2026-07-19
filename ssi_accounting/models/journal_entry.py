@@ -275,7 +275,7 @@ class JournalEntry(models.Model):
         index=True,
         copy=False,
         help="The journal entry this entry is a mirror reversal of, set "
-        "by the 'journal_entry_reversal' wizard.",
+        "when this entry is created by '_reverse_moves'.",
     )
     reversal_move_ids = fields.One2many(
         comodel_name="journal_entry",
@@ -292,10 +292,10 @@ class JournalEntry(models.Model):
         copy=False,
         help="Technical field: whether this entry's tax lines must be "
         "synced from the 'reverse' repartition lines instead of the "
-        "'base' ones. Set explicitly by the 'journal_entry_reversal' "
-        "wizard when it builds a mirror entry -- never derived from "
-        "'state' or a document-type concept (this model has none), per "
-        "this issue's Keputusan Desain. See "
+        "'base' ones. Set explicitly by '_reverse_move_vals' when it "
+        "builds a mirror entry -- never derived from 'state' or a "
+        "document-type concept (this model has none), per this issue's "
+        "Keputusan Desain. See "
         "'_prepare_product_base_line_for_taxes_computation'.",
     )
     exchange_diff_partial_ids = fields.One2many(
@@ -806,42 +806,9 @@ Solution: The entry is accounted on %(new_date)s instead
     # invoice-specific default values -- that concept does not exist on
     # this model) from Odoo core
     # ``addons/account/models/account_move.py``'s own reversal methods.
-    # Driven end-to-end by the 'journal_entry_reversal' wizard
-    # (``wizards/journal_entry_reversal.py``); 'action_reverse' below only
-    # opens it.
-
-    def action_reverse(self):
-        """Open the reversal wizard for every entry in 'self'."""
-        # NOT '.sudo()' -- unlike the generic SSI button pattern, this
-        # method only ever opens a wizard (no cross-model read that
-        # needs elevated access), and '_post()' (reached later, once the
-        # wizard confirms) deliberately keys its own accounting-group
-        # check off 'self.env.su' -- sudo-ing here would silently let
-        # any user post a reversal regardless of that check. Matches
-        # 'action_post'/'button_draft'/'button_cancel' above, none of
-        # which sudo either.
-        for record in self:
-            result = record._reverse()
-        return result
-
-    def _reverse(self):
-        """Open the 'journal_entry_reversal' wizard, pre-filled with 'self'.
-
-        Ported (behaviour-wise) from Odoo core
-        ``AccountMove.action_reverse``.
-        """
-        self.ensure_one()
-        return {
-            "name": self.env._("Reverse Entry"),
-            "type": "ir.actions.act_window",
-            "res_model": "journal_entry_reversal",
-            "view_mode": "form",
-            "target": "new",
-            "context": {
-                "default_move_ids": [Command.set(self.ids)],
-                "default_date": fields.Date.context_today(self),
-            },
-        }
+    # Driven by '_reverse_moves', used by 'reconcile_partial.unlink()' to
+    # reverse an exchange difference entry when a cross-currency
+    # reconciliation is undone.
 
     def action_view_reversal_moves(self):
         """Open the reversal entries of every entry in 'self' (smart button)."""
@@ -869,13 +836,12 @@ Solution: The entry is accounted on %(new_date)s instead
         (``_sync_dynamic_lines``/``_sync_tax_lines``) to regenerate from
         scratch, driven by that entry's own 'is_refund' flag (selecting
         the reverse repartition lines for a true reversal, the base ones
-        for the 'modify' method's plain copy -- see the class docstring's
-        tax engine section and this issue's Keputusan Desain).
+        otherwise -- see the class docstring's tax engine section and
+        this issue's Keputusan Desain).
 
         :param line: a ``journal_entry.item`` of ``self``.
         :param negate: whether ``balance``/``amount_currency`` are
-            flipped (a true reversal) or kept as-is (the 'modify'
-            method's fresh, editable draft copy).
+            flipped (a true reversal) or kept as-is (a plain copy).
         :return: a vals dict suitable for ``Command.create``.
         """
         sign = -1 if negate else 1
@@ -908,7 +874,7 @@ Solution: The entry is accounted on %(new_date)s instead
         vals (payment term, due date, ...) exist to strip.
 
         :param default_values: optional dict overriding 'journal_id'/
-            'date'/'ref' -- see 'journal_entry_reversal._prepare_default_reversal'.
+            'date'/'ref', supplied by the caller.
         :return: a vals dict suitable for ``journal_entry.create()``.
         """
         self.ensure_one()
@@ -922,33 +888,6 @@ Solution: The entry is accounted on %(new_date)s instead
             "is_refund": True,
             "line_ids": [
                 Command.create(self._prepare_reversal_line_vals(line, negate=True))
-                for line in self.line_ids
-                if line.display_type != "tax"
-            ],
-        }
-
-    def _prepare_modify_move_vals(self, default_values=None):
-        """Build create() vals for the 'modify' method's fresh draft copy.
-
-        Unlike '_reverse_move_vals', lines are copied as-is (not
-        negated) and 'is_refund' is left at its default ('False'): this
-        entry is a plain, editable continuation of 'self', not a
-        reversal -- see the 'refund_method' field's help text on
-        'journal_entry_reversal'.
-
-        :param default_values: optional dict, same shape as
-            '_reverse_move_vals''s own parameter.
-        :return: a vals dict suitable for ``journal_entry.create()``.
-        """
-        self.ensure_one()
-        default_values = default_values or {}
-        return {
-            "journal_id": default_values.get("journal_id", self.journal_id.id),
-            "date": default_values.get("date") or fields.Date.context_today(self),
-            "ref": self.ref,
-            "partner_id": self.partner_id.id,
-            "line_ids": [
-                Command.create(self._prepare_reversal_line_vals(line, negate=False))
                 for line in self.line_ids
                 if line.display_type != "tax"
             ],
@@ -1020,26 +959,6 @@ Solution: The entry is accounted on %(new_date)s instead
                         line.account_id == account and not line.reconciled
                     )
                 ).reconcile()
-
-    def _unlink_or_reverse(self):
-        """Safely dispose of 'self': unlink entries never posted, reverse the rest.
-
-        Ported (behaviour-wise) from Odoo core
-        ``AccountMove._unlink_or_reverse`` -- a utility a later unit can
-        call to get rid of a journal entry without ever hard-deleting
-        one that was posted. Not wired to any button in this issue (see
-        its out-of-scope section); ported now so a later unit's own
-        acceptance criteria does not have to re-derive it from scratch.
-        """
-        if not self:
-            return
-        to_reverse = self.filtered(
-            lambda move: move.posted_before or move.state != "draft"
-        )
-        to_unlink = self - to_reverse
-        to_reverse._reverse_moves(cancel=True)
-        to_unlink.filtered(lambda move: move.state != "cancel").button_cancel()
-        to_unlink.unlink()
 
     @api.model
     def _disable_recursion(self, container, method_name, default=None, target=True):
