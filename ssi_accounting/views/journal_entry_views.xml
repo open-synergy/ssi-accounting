@@ -85,9 +85,30 @@
                         invisible="state not in ('draft', 'posted')"
                         confirm="Are you sure you want to cancel this journal entry?"
                     />
+                    <button
+                        name="action_reverse"
+                        string="Reverse Entry"
+                        type="object"
+                        invisible="state != 'posted'"
+                    />
                     <field name="state" widget="statusbar" />
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button
+                            name="action_view_reversal_moves"
+                            type="object"
+                            class="oe_stat_button"
+                            icon="fa-history"
+                            invisible="reversal_move_count == 0"
+                        >
+                            <field
+                                name="reversal_move_count"
+                                widget="statinfo"
+                                string="Reversals"
+                            />
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <label for="name" />
                         <h1>
@@ -109,6 +130,11 @@
                             />
                             <field name="date" readonly="state != 'draft'" />
                             <field name="ref" readonly="state != 'draft'" />
+                            <field
+                                name="reversed_entry_id"
+                                readonly="1"
+                                invisible="not reversed_entry_id"
+                            />
                         </group>
                         <group name="secondary_group">
                             <field name="partner_id" readonly="state != 'draft'" />
