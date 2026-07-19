@@ -131,7 +131,18 @@ Design decisions
   first attempt, silently producing an unbalanced entry (caught by CI, not
   by this issue's own SQL-``CHECK`` review). Depending on ``balance`` via
   ``@api.depends`` instead of a second inverse hop is what makes every fill
-  direction cascade correctly, exactly like upstream.
+  direction cascade correctly, exactly like upstream. **One further
+  deviation from upstream's exact field kwargs, also caught by CI:**
+  ``debit``/``credit``/``amount_currency`` are deliberately **not**
+  ``precompute=True`` here, unlike upstream. A ``precompute=True`` field
+  without an explicit value is computed during ``create()``'s pre-insert
+  pass, *before* that same call's given-field inverses (where ``balance``
+  gets its real value when only ``amount_currency`` was supplied) have
+  run -- so a precomputed ``debit``/``credit`` would bake in a value
+  derived from ``balance`` still at its default, too early to see the
+  correct one. Only ``balance`` keeps ``precompute=True``: its compute is
+  a self-referential no-op whenever a value already exists, so it is
+  immune to this ordering trap regardless of fill direction.
 * ``_check_balanced``/``_get_unbalanced_moves`` are ported verbatim from
   upstream, raw SQL included (only the table names changed). Unbalanced
   entries are rejected with an SSI-formatted error unless the journal has a

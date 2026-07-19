@@ -79,6 +79,25 @@ class JournalEntryItem(models.Model):
     instead of via a second inverse hop is what makes the cascade work
     for every fill direction.
 
+    **A second, subtler pitfall: ``precompute=True`` on the *derived*
+    fields.** Upstream sets it on ``debit``/``credit``/``amount_currency``
+    (as well as ``balance``), and it is tempting to mirror that verbatim
+    -- but doing so here reintroduces the exact same class of bug via a
+    different mechanism: a ``precompute=True`` field lacking an explicit
+    value gets computed **during ``create()``'s pre-insert pass**, before
+    the *given*-field inverses of that same call (which is where
+    ``balance`` gets its real, final value when the caller only supplied
+    ``amount_currency``) have run. Concretely: create a line with only
+    ``amount_currency`` given -- if ``debit``/``credit`` are
+    ``precompute=True``, they get computed pre-insert against ``balance``
+    still at its default (0), *then* ``_inverse_amount_currency`` sets
+    ``balance`` for real post-insert, too late for the already-baked-in
+    ``debit``/``credit`` to notice. Only ``balance`` itself keeps
+    ``precompute=True`` here: its own compute is a self-referential
+    no-op whenever a value already exists (see
+    ``_compute_balance``'s docstring), so it is immune to this ordering
+    trap regardless of which of the three fill directions supplied it.
+
     **Deliberately dropped from the upstream model** (out of this issue's
     scope, see the issue's "Dibuang dari baris" list):
     ``analytic_distribution``, ``term_key``, ``epd_*``,
@@ -219,20 +238,24 @@ class JournalEntryItem(models.Model):
         compute="_compute_debit_credit",
         inverse="_inverse_debit",
         store=True,
-        precompute=True,
         help="Amount posted to the debit side of 'account_id', in the "
         "company currency. Derived from 'balance'; editing this directly "
-        "updates 'balance' (and therefore 'credit') back.",
+        "updates 'balance' (and therefore 'credit') back. Deliberately "
+        "**not** 'precompute=True' -- see the class docstring: unlike "
+        "'balance' itself, a precomputed 'debit'/'credit' would be baked "
+        "in during create()'s pre-insert pass, before a same-call "
+        "'amount_currency'-only fill direction gets a chance to resolve "
+        "'balance' via its own inverse, leaving 'debit'/'credit' stale.",
     )
     credit = fields.Monetary(
         currency_field="company_currency_id",
         compute="_compute_debit_credit",
         inverse="_inverse_credit",
         store=True,
-        precompute=True,
         help="Amount posted to the credit side of 'account_id', in the "
         "company currency. Derived from 'balance'; editing this directly "
-        "updates 'balance' (and therefore 'debit') back.",
+        "updates 'balance' (and therefore 'debit') back. See 'debit' for "
+        "why this is deliberately not 'precompute=True'.",
     )
     balance = fields.Monetary(
         currency_field="company_currency_id",
@@ -244,7 +267,12 @@ class JournalEntryItem(models.Model):
         "'credit'. This is the primary field the other three fill "
         "directions ('debit'/'credit', 'amount_currency') all resolve "
         "back into -- see this class's docstring for why a two-hop "
-        "inverse chain does not reliably cascade during create().",
+        "inverse chain does not reliably cascade during create(). Safe "
+        "to keep 'precompute=True' here (unlike 'debit'/'credit'/"
+        "'amount_currency'): its compute is a self-referential no-op "
+        "when a value already exists, so an early pre-insert pass never "
+        "clobbers a value one of the other three inverses sets later in "
+        "the same create() call.",
     )
     amount_currency = fields.Monetary(
         currency_field="currency_id",
@@ -252,11 +280,11 @@ class JournalEntryItem(models.Model):
         inverse="_inverse_amount_currency",
         store=True,
         readonly=False,
-        precompute=True,
         help="Signed amount expressed in 'currency_id'. Equal to "
         "'balance' when the line's currency is the company currency; "
         "editing this directly on a foreign-currency line recomputes "
-        "'balance' (and therefore 'debit'/'credit') using 'currency_rate'.",
+        "'balance' (and therefore 'debit'/'credit') using 'currency_rate'. "
+        "See 'debit' for why this is deliberately not 'precompute=True'.",
     )
     currency_id = fields.Many2one(
         comodel_name="res.currency",

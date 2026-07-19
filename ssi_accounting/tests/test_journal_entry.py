@@ -35,7 +35,10 @@ class TestJournalEntry(YamlTransactionCase):
                 {
                     "journal_id": journal.id,
                     "line_ids": [
-                        (0, 0, {"display_type": "product", "debit": 10.0, "credit": 0.0}),
+                        # display_type defaults to "product" -- left implicit
+                        # on purpose, matching how a real product line would
+                        # be created.
+                        (0, 0, {"debit": 10.0, "credit": 0.0}),
                         (0, 0, {"account_id": acc_b.id, "debit": 0.0, "credit": 10.0}),
                     ],
                 }
