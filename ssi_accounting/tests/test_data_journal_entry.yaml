@@ -1,35 +1,32 @@
 options:
   auto_refresh: true
 
-setup:
-  steps:
-    - step: "Create a journal"
-      action: "create"
-      model: "account.journal"
-      save_as: "journal"
-      values:
-        name: "General Journal"
-        type: "general"
-    - step: "Create the debit-side account"
-      action: "create"
-      model: "account.account"
-      save_as: "acc_a"
-      values:
-        name: "Account A"
-        account_type: "asset_current"
-        code: "JE0001"
-    - step: "Create the credit-side account"
-      action: "create"
-      model: "account.account"
-      save_as: "acc_b"
-      values:
-        name: "Account B"
-        account_type: "income"
-        code: "JE0002"
-
 scenarios:
   - name: "Two-line balanced entry can be saved in draft"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE1001"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE1002"
       - step: "Create a balanced entry"
         action: "create"
         model: "journal_entry"
@@ -67,6 +64,29 @@ scenarios:
 
   - name: "Filling debit/credit computes balance and amount_currency (same currency)"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE2001"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE2002"
       - step: "Create an entry with a debit line"
         action: "create"
         model: "journal_entry"
@@ -107,6 +127,29 @@ scenarios:
 
   - name: "Filling balance directly derives debit/credit (second fill direction)"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE3001"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE3002"
       - step: "Create an entry, one line filled via balance"
         action: "create"
         model: "journal_entry"
@@ -144,6 +187,29 @@ scenarios:
       "Foreign-currency line fills currency_rate/amount_currency, third fill direction
       back-computes balance"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE4001"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE4002"
       - step: "Create a foreign currency"
         action: "create"
         model: "res.currency"
@@ -205,6 +271,29 @@ scenarios:
       "product_id/quantity/price_unit are informational: price_subtotal follows
       amount_currency"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE5001"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE5002"
       - step: "Create an entry with a product-informed line"
         action: "create"
         model: "journal_entry"
@@ -244,6 +333,29 @@ scenarios:
 
   - name: "Deleting the header deletes its lines"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE6001"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE6002"
       - step: "Create a balanced entry"
         action: "create"
         model: "journal_entry"
@@ -273,6 +385,29 @@ scenarios:
 
   - name: "An unbalanced entry is rejected with an SSI-formatted error"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE7001"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE7002"
       - step: "Creating an unbalanced entry is rejected"
         action: "create"
         model: "journal_entry"
@@ -295,6 +430,21 @@ scenarios:
 
   - name: "A line whose account belongs to another company is rejected"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE8001"
       - step: "Create a second company"
         action: "create"
         model: "res.company"
@@ -309,7 +459,7 @@ scenarios:
           allowed_company_ids: ["REC: company_b.id"]
         values:
           name: "Foreign Account"
-          code: "JEFOREIGN1"
+          code: "JE8FOREIGN"
           account_type: "income"
           company_ids: [[6, 0, ["REC: company_b.id"]]]
       - step: "Creating an entry with a cross-company line is rejected"
@@ -333,6 +483,21 @@ scenarios:
 
   - name: "A line without an account_id is rejected"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE9002"
       - step: "Creating an entry with a line lacking account_id is rejected"
         action: "create"
         model: "journal_entry"
@@ -353,6 +518,29 @@ scenarios:
 
   - name: "Edit a journal entry's reference"
     steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Account A"
+          account_type: "asset_current"
+          code: "JE1101"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Account B"
+          account_type: "income"
+          code: "JE1102"
       - step: "Create a balanced entry"
         action: "create"
         model: "journal_entry"

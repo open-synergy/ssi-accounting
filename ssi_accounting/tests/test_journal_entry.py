@@ -57,5 +57,8 @@ class TestJournalEntry(YamlTransactionCase):
             order="date asc, id asc",
         )
         self.assertEqual(len(lines), 2)
-        self.assertEqual(lines[0].cumulated_balance, 50.0)
-        self.assertEqual(lines[1].cumulated_balance, 80.0)
+        # Read both values off the SAME recordset in one shot: indexing
+        # `lines[0]`/`lines[1]` separately would each create its own
+        # single-record recordset, resetting the running total per access
+        # (see `_compute_cumulated_balance`'s docstring).
+        self.assertEqual(lines.mapped("cumulated_balance"), [50.0, 80.0])
