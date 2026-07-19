@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Global multi-company isolation: tax_group.company_id is required,
+         so a plain company_id-in-allowed-companies domain is enough. No
+         `groups` field on purpose -> applies to every user, same as the
+         other multi-company rules shipped by Odoo core. -->
+    <record id="tax_group_multi_company_rule" model="ir.rule">
+        <field name="name">Tax Group - Multi Company</field>
+        <field name="model_id" ref="model_tax_group" />
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>

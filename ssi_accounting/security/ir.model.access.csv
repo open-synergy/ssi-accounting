@@ -13,3 +13,9 @@ access_account_journal_all,account.journal - all,model_account_journal,base.grou
 access_account_journal_manager,account.journal - manager,model_account_journal,group_accounting_manager,1,1,1,1
 access_account_journal_group_all,account.journal.group - all,model_account_journal_group,base.group_user,1,0,0,0
 access_account_journal_group_manager,account.journal.group - manager,model_account_journal_group,group_accounting_manager,1,1,1,1
+access_tax_group_all,tax_group - all,model_tax_group,base.group_user,1,0,0,0
+access_tax_group_manager,tax_group - manager,model_tax_group,group_accounting_manager,1,1,1,1
+access_tax_all,tax - all,model_tax,base.group_user,1,0,0,0
+access_tax_manager,tax - manager,model_tax,group_accounting_manager,1,1,1,1
+access_tax_repartition_line_all,tax.repartition_line - all,model_tax_repartition_line,base.group_user,1,0,0,0
+access_tax_repartition_line_manager,tax.repartition_line - manager,model_tax_repartition_line,group_accounting_manager,1,1,1,1

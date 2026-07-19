@@ -1,0 +1,121 @@
+scenarios:
+  - name: "Create a tax group"
+    steps:
+      - step: "Create tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "VAT"
+          sequence: 5
+      - step: "Assert created"
+        action: "assert"
+        target: "group"
+        asserts:
+          id:
+            type: "value"
+            operator: "is_truthy"
+          name:
+            type: "value"
+            expected: "VAT"
+          sequence:
+            type: "value"
+            expected: 5
+
+  - name: "Edit tax group name"
+    steps:
+      - step: "Create tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Original Name"
+      - step: "Write new name"
+        action: "write"
+        target: "group"
+        values:
+          name: "Updated Name"
+      - step: "Assert name updated"
+        action: "assert"
+        target: "group"
+        asserts:
+          name:
+            type: "value"
+            expected: "Updated Name"
+
+  - name: "Delete a tax group"
+    steps:
+      - step: "Create tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Disposable Group"
+      - step: "Delete the tax group"
+        action: "unlink"
+        target: "group"
+      - step: "Verify deleted"
+        action: "search"
+        model: "tax_group"
+        domain: [["name", "=", "Disposable Group"]]
+        save_as: "result"
+        expect_count: 0
+
+  - name: "Country code follows country_id"
+    steps:
+      - step: "Get Indonesia"
+        action: "ref"
+        xml_id: "base.id"
+        save_as: "indonesia"
+      - step: "Create tax group with a country"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "PPN"
+          country_id: "REC: indonesia.id"
+      - step: "Assert country_code mirrors country_id.code"
+        action: "assert"
+        target: "group"
+        asserts:
+          country_code:
+            type: "value"
+            expected: "ID"
+
+  - name: "Payable and receivable accounts from the same company are accepted"
+    steps:
+      - step: "Create payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "payable_account"
+        values:
+          name: "Tax Payable"
+          code: "TAXPAY01"
+          account_type: "liability_current"
+      - step: "Create receivable account"
+        action: "create"
+        model: "account.account"
+        save_as: "receivable_account"
+        values:
+          name: "Tax Receivable"
+          code: "TAXREC01"
+          account_type: "asset_current"
+      - step: "Create tax group with both accounts of the same company"
+        action: "create"
+        model: "tax_group"
+        save_as: "group"
+        values:
+          name: "Same Company Group"
+          company_id: "REC: company.id"
+          tax_payable_account_id: "REC: payable_account.id"
+          tax_receivable_account_id: "REC: receivable_account.id"
+      - step: "Assert both accounts are set"
+        action: "assert"
+        target: "group"
+        asserts:
+          tax_payable_account_id:
+            type: "m2o"
+            expected: "REC: payable_account"
+          tax_receivable_account_id:
+            type: "m2o"
+            expected: "REC: receivable_account"

@@ -25,6 +25,8 @@
         "security/ir_rule/account_group.xml",
         "security/ir_rule/journal.xml",
         "security/ir_rule/journal_group.xml",
+        "security/ir_rule/tax.xml",
+        "security/ir_rule/tax_group.xml",
         "menu.xml",
         "views/account_views.xml",
         "views/account_group_views.xml",
@@ -32,5 +34,7 @@
         "views/journal_views.xml",
         "views/journal_group_views.xml",
         "views/res_company_views.xml",
+        "views/tax_group_views.xml",
+        "views/tax_views.xml",
     ],
 }

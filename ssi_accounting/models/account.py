@@ -65,13 +65,13 @@ class AccountAccount(models.Model):
     ``code_store``), so it must be right from the start.
 
     **Forward references to models that do not exist yet in this repo**
-    (``account.move.line``, ``account.journal``, ``tax``,
-    ``tax.repartition.line``) are guarded with ``"<model>" not in
-    self.env`` / ``"<field>" in self._fields`` checks, exactly like
-    ``account_group.py``'s ``_adapt_accounts_for_account_groups`` and
-    ``res_currency.py``'s ``_has_accounting_entries`` already do. Each
-    guard is a no-op today and starts doing real work the moment the
-    corresponding unit lands, with no further change needed here:
+    (``account.move.line``, ``account.journal``) are guarded with
+    ``"<model>" not in self.env`` / ``"<field>" in self._fields`` checks,
+    exactly like ``account_group.py``'s
+    ``_adapt_accounts_for_account_groups`` and ``res_currency.py``'s
+    ``_has_accounting_entries`` already do. Each guard is a no-op today
+    and starts doing real work the moment the corresponding unit lands,
+    with no further change needed here:
 
     - ``account.move.line`` (journal items): ``used``, ``current_balance``,
       ``_toggle_reconcile_to_true``/``_toggle_reconcile_to_false``,
@@ -81,8 +81,12 @@ class AccountAccount(models.Model):
       journal/account currency mismatch check; upstream's extra
       ``account.payment.method`` branches are dropped -- no payment method
       concept exists anywhere in this repo's planned scope).
-    - ``tax`` / ``tax.repartition.line``: ``related_taxes_amount``,
-      ``action_open_related_taxes``, ``_unlink_except_linked_to_tax_repartition_line``.
+
+    **``tax``/``tax.repartition_line`` now exist** (added by the tax
+    configuration unit): ``related_taxes_amount``, ``action_open_related_taxes``
+    and ``_unlink_except_linked_to_tax_repartition_line`` were guarded the
+    same way while those models did not exist yet, and now work for real
+    -- no change was needed here beyond the guard already being in place.
 
     **``tax_ids`` is deliberately NOT added in this unit.** A Many2many
     field needs a real comodel at registry-build time -- unlike a method
@@ -1107,9 +1111,9 @@ Solution: Remove or reassign the journal items before deleting the account
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_linked_to_tax_repartition_line(self):
-        if "tax.repartition.line" not in self.env:
+        if "tax.repartition_line" not in self.env:
             return
-        if self.env["tax.repartition.line"].search_count(
+        if self.env["tax.repartition_line"].search_count(
             [("account_id", "in", self.ids)], limit=1
         ):
             raise UserError(

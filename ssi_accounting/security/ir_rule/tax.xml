@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Global multi-company isolation: tax.company_id is required, so a
+         plain company_id-in-allowed-companies domain is enough. No
+         `groups` field on purpose -> applies to every user, same as the
+         other multi-company rules shipped by Odoo core.
+
+         tax.repartition_line is a pure child of tax (ondelete="cascade")
+         and gets no ir.rule of its own, per this issue's design decision:
+         it is only ever reached through tax's own
+         repartition_line_base_ids/repartition_line_reverse_ids, so this
+         rule on tax is enough to keep it company-scoped too. -->
+    <record id="tax_multi_company_rule" model="ir.rule">
+        <field name="name">Tax - Multi Company</field>
+        <field name="model_id" ref="model_tax" />
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>
