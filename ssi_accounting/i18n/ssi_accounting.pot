@@ -2949,7 +2949,10 @@ msgstr ""
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__tax_line_id
 msgid ""
 "Technical field: which tax this line represents, when 'display_type' is "
-"'tax'."
+"'tax'. Derived from 'tax_repartition_line_id' -- ported (behaviour-wise) "
+"from upstream 'account.move.line.tax_line_id', which is the same related "
+"field; not set directly by '_sync_tax_lines'/'_prepare_tax_lines' grouping "
+"keys, exactly like upstream."
 msgstr ""
 
 #. module: ssi_accounting
