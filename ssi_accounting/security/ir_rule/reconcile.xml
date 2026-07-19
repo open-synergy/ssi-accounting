@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Global multi-company isolation, same idea as journal_entry's own
+         rule: both reconcile_partial.company_id and
+         reconcile_full.reconciled_line_ids.company_id are stored, so a
+         plain company_id-in-allowed-companies domain is enough. -->
+    <record id="reconcile_partial_multi_company_rule" model="ir.rule">
+        <field name="name">Reconcile Partial - Multi Company</field>
+        <field name="model_id" ref="model_reconcile_partial" />
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="reconcile_full_multi_company_rule" model="ir.rule">
+        <field name="name">Reconcile Full - Multi Company</field>
+        <field name="model_id" ref="model_reconcile_full" />
+        <field
+            name="domain_force"
+        >[('reconciled_line_ids.company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>

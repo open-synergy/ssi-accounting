@@ -292,6 +292,38 @@ Design decisions
   adds ``reconcile()``/``amount_residual`` (not a declared dependency of this unit),
   the same defensive pattern already used elsewhere in this module; ``modify``
   additionally opens a fresh, editable draft copy of the original's lines.
+* Journal item reconciliation is added through two new models, ``reconcile_partial``
+  and ``reconcile_full``, ported (behaviour-wise) from Odoo core's
+  ``account.partial.reconcile``/``account.full.reconcile``, plus the whole
+  ``reconcile()`` chain on ``journal_entry.item`` (ported from
+  ``account.move.line``). ``journal_entry.item`` gains ``reconciled``,
+  ``amount_residual``/``amount_residual_currency``, ``full_reconcile_id``,
+  ``matched_debit_ids``/``matched_credit_ids`` and ``matching_number`` --
+  the field the two ``_toggle_reconcile_to_true``/``_toggle_reconcile_to_false``
+  guards on ``account.account`` (forward-declared by an earlier unit) and the
+  ``_reconcile_reversed_moves`` guard on ``journal_entry`` (forward-declared
+  by the reversal unit) were all waiting on; they now work for real, with no
+  change needed at their own call sites.
+* Reconciliation is intentionally narrower than upstream: it only ever
+  matches items on an account with ``reconcile = True`` (no exemption for
+  ``asset_cash``/``liability_credit_card`` -- that exemption exists upstream
+  solely for bank-statement reconciliation, out of this unit's scope), only
+  within a single company, and only on items whose journal entry is
+  ``posted`` (upstream additionally allows a draft entry through). Selisih
+  kurs (currency exchange difference) entry generation is dropped entirely --
+  ``reconcile_partial.exchange_move_id`` is kept as a field but never
+  populated by this unit, the same forward-reference pattern used elsewhere
+  in this module; a later, dedicated currency unit is expected to populate
+  it. Cash-basis tax entries and ``account.reconcile.model`` (automatic bank
+  statement matching) are out of scope entirely.
+* The reconciliation UI for this unit is a **multi-select "Reconcile"/
+  "Unreconcile" header button pair on the Journal Items list view**
+  (``action_reconcile``/``action_remove_move_reconcile``), plus a
+  ``matching_number`` column and a "Reconciled"/"Unreconciled" search
+  filter -- a deliberate, first-wave choice, **not** the OWL Bankrec
+  reconciliation widget upstream Odoo ships. Matching lines to reconcile is
+  entirely manual (select rows on the same, reconciliation-enabled account,
+  then click "Reconcile"); there is no suggested-match assistant.
 
 
 Installation

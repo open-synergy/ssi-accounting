@@ -218,6 +218,17 @@
                 <field name="account_id" />
                 <field name="partner_id" />
                 <field name="journal_id" />
+                <field name="matching_number" />
+                <filter
+                    name="filter_reconciled"
+                    string="Reconciled"
+                    domain="[('reconciled', '=', True)]"
+                />
+                <filter
+                    name="filter_unreconciled"
+                    string="Unreconciled"
+                    domain="[('reconciled', '=', False), ('account_id.reconcile', '=', True)]"
+                />
                 <!-- Group By -->
                 <group>
                     <filter
@@ -235,6 +246,11 @@
                         string="Date"
                         context="{'group_by': 'date'}"
                     />
+                    <filter
+                        name="group_by_matching_number"
+                        string="Matching #"
+                        context="{'group_by': 'matching_number'}"
+                    />
                 </group>
             </search>
         </field>
@@ -245,6 +261,15 @@
         <field name="model">journal_entry.item</field>
         <field name="arch" type="xml">
             <list string="Journal Items" default_order="date desc, move_name desc">
+                <header>
+                    <button name="action_reconcile" type="object" string="Reconcile" />
+                    <button
+                        name="action_remove_move_reconcile"
+                        type="object"
+                        string="Unreconcile"
+                        confirm="Are you sure you want to remove the reconciliation of the selected journal items?"
+                    />
+                </header>
                 <field name="date" />
                 <field name="move_name" />
                 <field name="journal_id" />
@@ -253,6 +278,9 @@
                 <field name="name" />
                 <field name="debit" sum="Total Debit" />
                 <field name="credit" sum="Total Credit" />
+                <field name="amount_residual" optional="hide" />
+                <field name="matching_number" />
+                <field name="reconciled" optional="hide" />
                 <field name="cumulated_balance" />
                 <field name="company_id" groups="base.group_multi_company" />
             </list>
@@ -293,6 +321,11 @@
                                 groups="base.group_multi_currency"
                                 readonly="parent_state != 'draft'"
                             />
+                        </group>
+                        <group name="reconciliation_group">
+                            <field name="matching_number" readonly="1" />
+                            <field name="reconciled" readonly="1" />
+                            <field name="amount_residual" readonly="1" />
                         </group>
                     </group>
                 </sheet>

@@ -13,6 +13,7 @@ from . import test_journal_entry_posting
 from . import test_journal_entry_reversal
 from . import test_journal_group
 from . import test_mixin_sequence_number
+from . import test_reconcile
 from . import test_res_company
 from . import test_res_currency
 from . import test_security_groups
