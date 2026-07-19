@@ -14,4 +14,5 @@ from . import test_res_company
 from . import test_res_currency
 from . import test_security_groups
 from . import test_tax
+from . import test_tax_computation
 from . import test_tax_group
