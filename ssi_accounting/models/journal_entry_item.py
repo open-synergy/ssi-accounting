@@ -554,21 +554,31 @@ class JournalEntryItem(models.Model):
         consistent with 'balance' (the common case), so it is safe to
         run unconditionally rather than only for lines missing them.
 
-        **Run under ``skip_check_balanced_constrains``**: this refresh
-        assigns ``line.debit``/``line.credit`` field-by-field, and Odoo's
-        own field setter turns that into a ``write()`` -- reaching this
-        model's ``_check_balanced_constrains`` while a taxed line has
-        just been created but its own tax line has not been synced yet
-        (that only happens afterwards, in ``journal_entry._sync_tax_lines``).
-        Without the flag, that eager, mid-construction check would reject
-        an entry that is only transiently unbalanced, not actually
-        broken -- see ``journal_entry._check_balanced_constrains``'s
-        docstring for the full reasoning. ``records`` itself (returned
+        **Run under both sync-suppression flags**: this refresh assigns
+        ``line.debit``/``line.credit``/``line.amount_currency``
+        field-by-field, and Odoo's own field setter turns each assignment
+        into a ``write()`` -- which, since ``debit``'s/``credit``'s
+        ``inverse`` methods themselves assign back into ``balance``
+        (see the class docstring), cascades into further nested
+        ``write()`` calls. Every one of them would otherwise reach this
+        model's ``write()`` override (re-running the full tax/balancing
+        sync, redundantly, once per cascaded assignment) and its
+        ``_check_balanced_constrains``/explicit final check (rejecting a
+        taxed line whose own tax line has not been synced yet -- that
+        only happens afterwards, in ``journal_entry._sync_tax_lines``).
+        ``skip_journal_entry_sync_dynamic_lines`` suppresses the former
+        (the same flag ``journal_entry.write()``'s own recursion guard
+        uses), ``skip_check_balanced_constrains`` the latter -- see
+        ``journal_entry._check_balanced_constrains``'s docstring for the
+        full reasoning on that second one. ``records`` itself (returned
         below) is never rebound to the flagged context, so nothing leaks
         to the caller.
         """
         records = super().create(vals_list)
-        refresh = records.with_context(skip_check_balanced_constrains=True)
+        refresh = records.with_context(
+            skip_check_balanced_constrains=True,
+            skip_journal_entry_sync_dynamic_lines=True,
+        )
         refresh._compute_debit_credit()
         refresh._compute_amount_currency()
         return records

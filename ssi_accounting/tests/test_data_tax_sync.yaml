@@ -936,10 +936,12 @@ scenarios:
           code: "TS10FOREIGN"
           account_type: "liability_current"
           company_ids: [[6, 0, ["REC: company_b.id"]]]
-      - step: "Create VAT 11% whose tax repartition line posts to the foreign account"
+      - step:
+          "Creating a tax repartition line whose account posts cross-company is rejected"
         action: "create"
         model: "tax"
-        save_as: "vat11"
+        expect_error:
+          type: "UserError"
         values:
           name: "VAT 11% (Sync 10)"
           amount_type: "percent"
@@ -955,46 +957,3 @@ scenarios:
               - document_type: "base"
                 repartition_type: "tax"
                 account_id: "REC: foreign_account.id"
-      - step: "Create a journal"
-        action: "create"
-        model: "account.journal"
-        save_as: "journal"
-        values:
-          name: "Tax Sync Journal 10"
-          type: "general"
-      - step: "Create the expense account"
-        action: "create"
-        model: "account.account"
-        save_as: "acc_expense"
-        values:
-          name: "Expense Account 10"
-          account_type: "expense"
-          code: "TS10001"
-      - step: "Create the payable account"
-        action: "create"
-        model: "account.account"
-        save_as: "acc_payable"
-        values:
-          name: "Payable Account 10"
-          account_type: "liability_current"
-          code: "TS10002"
-      - step: "Creating an entry whose tax posts cross-company is rejected"
-        action: "create"
-        model: "journal_entry"
-        expect_error:
-          type: "UserError"
-        values:
-          journal_id: "REC: journal.id"
-          line_ids:
-            - - 0
-              - 0
-              - account_id: "REC: acc_expense.id"
-                balance: 1000000.0
-                tax_ids:
-                  - - 6
-                    - 0
-                    - - "REC: vat11.id"
-            - - 0
-              - 0
-              - account_id: "REC: acc_payable.id"
-                balance: -1110000.0
