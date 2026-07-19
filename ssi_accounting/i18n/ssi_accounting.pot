@@ -116,6 +116,27 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/wizards/journal_entry_reversal.py:0
+msgid ""
+"\n"
+"Context: Reverse journal entry\n"
+"Problem: No journal entry was selected\n"
+"Solution: Select at least one posted journal entry to reverse\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/wizards/journal_entry_reversal.py:0
+msgid ""
+"\n"
+"Context: Reverse journal entry\n"
+"Problem: The following entries are not posted, so cannot be reversed:\n"
+"%(entries)s\n"
+"Solution: Select only posted journal entries\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/models/account.py:0
 msgid ""
 "\n"
@@ -383,6 +404,14 @@ msgid "%s is not a stored field"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_reversal__refund_method
+msgid ""
+"'Cancel' reverses and auto-reconciles the reversal against the original. "
+"'Modify' reverses, then opens a new draft copy of the original lines to "
+"correct and re-post."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax__amount_type
 msgid ""
 "'Group of Taxes': this tax is a set of sub taxes. 'Fixed': the tax amount "
@@ -564,6 +593,13 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_form
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.view_company_form_inherit_ssi_accounting
 msgid "Accounting"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_reversal__date
+msgid ""
+"Accounting date given to the reversal entry (and, for 'modify', the new "
+"draft copy) -- not the original entry's own date."
 msgstr ""
 
 #. module: ssi_accounting
@@ -827,8 +863,14 @@ msgid "Broad accounting group derived from account_type."
 msgstr ""
 
 #. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_reversal_view_form
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
 msgid "Cancel"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry_reversal__refund_method__cancel
+msgid "Cancel: create a reversal entry and reconcile it with the original"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1018,6 +1060,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__create_uid
@@ -1033,6 +1076,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__create_date
@@ -1127,6 +1171,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__date
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__date
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__date
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
@@ -1214,6 +1259,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_currency__display_name
@@ -1519,6 +1565,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_currency__id
@@ -1645,6 +1692,11 @@ msgid "Is Follower"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__is_refund
+msgid "Is Refund"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__is_same_currency
 msgid "Is Same Currency"
 msgstr ""
@@ -1663,6 +1715,7 @@ msgstr ""
 #: model:ir.model,name:ssi_accounting.model_account_journal
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__journal_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__journal_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__journal_id
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
 msgid "Journal"
@@ -1671,7 +1724,9 @@ msgstr ""
 #. module: ssi_accounting
 #. odoo-python
 #: code:addons/ssi_accounting/models/journal.py:0
+#: code:addons/ssi_accounting/wizards/journal_entry_reversal.py:0
 #: model:ir.actions.act_window,name:ssi_accounting.journal_entry_action
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__move_ids
 #: model:ir.ui.menu,name:ssi_accounting.journal_entry_menu
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_list
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
@@ -1719,8 +1774,20 @@ msgid "Journal Suspense Account"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__reversal_move_ids
+msgid "Journal entries that reverse this one."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__move_id
 msgid "Journal entry this line belongs to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_reversal__journal_id
+msgid ""
+"Journal the reversal entry (and, for 'modify', the new draft copy) is posted"
+" to. Left empty to reuse each original entry's own journal."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1818,6 +1885,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__write_uid
@@ -1833,6 +1901,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__write_date
@@ -1948,6 +2017,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.constraint,message:ssi_accounting.constraint_journal_entry_item_check_accountable_required_fields
 msgid "Missing required account on accountable line."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry_reversal__refund_method__modify
+msgid "Modify: create a reversal entry, then reopen a new draft copy"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2118,6 +2192,11 @@ msgid "Optional due date for this line."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_reversal__reason
+msgid "Optional free-form reason appended to the reversal entry's reference."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__tag_ids
 msgid "Optional grid tags used for tax reporting."
 msgstr ""
@@ -2250,6 +2329,11 @@ msgid "Posted balance of this account in the active company."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_reversal__move_ids
+msgid "Posted journal entries to reverse."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__preceding_subtotal
 msgid "Preceding Subtotal"
 msgstr ""
@@ -2298,6 +2382,11 @@ msgid "Quantity"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__reason
+msgid "Reason"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__asset_receivable
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Receivable"
@@ -2307,6 +2396,11 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__ref
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__ref
 msgid "Reference"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_reversal__refund_method
+msgid "Refund Method"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2328,13 +2422,62 @@ msgid "Responsible User"
 msgstr ""
 
 #. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "Reversal Entries"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__reversal_move_count
+msgid "Reversal Move Count"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__reversed_entry_id
+msgid "Reversal Of"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+#: code:addons/ssi_accounting/wizards/journal_entry_reversal.py:0
+msgid "Reversal of: %(name)s"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/wizards/journal_entry_reversal.py:0
+msgid "Reversal of: %(name)s, %(reason)s"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__reversal_move_ids
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Reversals"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__tax_repartition_line__document_type__reverse
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_reversal_view_form
 msgid "Reverse"
 msgstr ""
 
 #. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_form
 msgid "Reverse Distribution"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_reversal_view_form
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Reverse Entry"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_journal_entry_reversal
+msgid "Reverse Journal Entry"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2837,6 +2980,12 @@ msgid "Technical field: mirrors the parent journal entry's reference."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__reversal_move_count
+msgid ""
+"Technical field: number of 'reversal_move_ids', shown on the smart button."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__extra_tax_data
 msgid ""
 "Technical field: opaque tax computation detail attached to this line by the "
@@ -2925,6 +3074,17 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__is_refund
+msgid ""
+"Technical field: whether this entry's tax lines must be synced from the "
+"'reverse' repartition lines instead of the 'base' ones. Set explicitly by "
+"the 'journal_entry_reversal' wizard when it builds a mirror entry -- never "
+"derived from 'state' or a document-type concept (this model has none), per "
+"this issue's Keputusan Desain. See "
+"'_prepare_product_base_line_for_taxes_computation'."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry__posted_before
 msgid ""
 "Technical field: whether this journal entry has ever been posted. Stays true"
@@ -2963,6 +3123,13 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_test_mixin_sequence_number
 msgid "Test Mixin Sequence Number"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__reversed_entry_id
+msgid ""
+"The journal entry this entry is a mirror reversal of, set by the "
+"'journal_entry_reversal' wizard."
 msgstr ""
 
 #. module: ssi_accounting
@@ -3128,4 +3295,10 @@ msgstr ""
 #. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_form
 msgid "e.g. Current Assets"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "id"
 msgstr ""
