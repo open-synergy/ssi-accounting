@@ -290,3 +290,112 @@ class TestTaxComputation(YamlTransactionCase):
             100.0,
             places=2,
         )
+
+    def test_full_pipeline_prepares_tax_lines_across_two_lines(self):
+        """`_prepare_tax_lines`/`_add_accounting_data_in_base_lines_tax_details`
+        (both explicitly named in the issue's Keputusan Desain) are only
+        ever meaningful once run at the end of the full multi-line
+        pipeline: `_add_tax_details_in_base_lines` ->
+        `_round_base_lines_tax_details` ->
+        `_add_accounting_data_in_base_lines_tax_details` ->
+        `_prepare_tax_lines`. Two identical price-included lines are used
+        so both collapse into a single proposed tax line (same tax,
+        account, partner, currency), exercising the 'included' rounding
+        mode of `_round_tax_details_base_lines` along the way -- a mode
+        `compute_all` (which skips `_round_base_lines_tax_details`
+        entirely) never reaches.
+        """
+        tax = self._create_tax(
+            name="VAT 10% Included Pipeline",
+            amount_type="percent",
+            amount=10.0,
+            price_include_override="tax_included",
+        )
+        company = self.env.company
+        base_lines = [
+            self.env["tax"]._prepare_base_line_for_taxes_computation(
+                None,
+                tax_ids=tax,
+                currency_id=self.currency,
+                price_unit=110.0,
+                quantity=1.0,
+            )
+            for _ in range(2)
+        ]
+        self.env["tax"]._add_tax_details_in_base_lines(base_lines, company)
+        self.env["tax"]._round_base_lines_tax_details(base_lines, company)
+        self.env["tax"]._add_accounting_data_in_base_lines_tax_details(
+            base_lines, company
+        )
+        result = self.env["tax"]._prepare_tax_lines(base_lines, company)
+
+        self.assertEqual(len(result["base_lines_to_update"]), 2)
+        for _base_line, amounts in result["base_lines_to_update"]:
+            self.assertAlmostEqual(amounts["balance"], 100.0, places=2)
+
+        self.assertEqual(len(result["tax_lines_to_add"]), 1)
+        tax_line = result["tax_lines_to_add"][0]
+        self.assertAlmostEqual(tax_line["balance"], 20.0, places=2)
+        self.assertAlmostEqual(tax_line["tax_base_amount"], 200.0, places=2)
+        self.assertEqual(result["tax_lines_to_delete"], [])
+        self.assertEqual(result["tax_lines_to_update"], [])
+
+    def test_handle_price_include_false_forces_total_excluded(self):
+        """`handle_price_include=False` treats `price_unit` as already
+        excluded, bypassing the tax's own `price_include` configuration
+        -- exercises the price-excluded evaluation pass
+        (`_ascending_process_price_excluded_taxes_batch`) even for a
+        price-included tax, instead of the price-included one
+        (`_descending_process_price_included_taxes_batch`) `compute_all`
+        would otherwise take.
+        """
+        tax = self._create_tax(
+            name="VAT 10% Included, Forced Excluded",
+            amount_type="percent",
+            amount=10.0,
+            price_include_override="tax_included",
+        )
+        result = tax.compute_all(100.0, handle_price_include=False)
+        self.assertAlmostEqual(result["total_excluded"], 100.0, places=2)
+        self.assertAlmostEqual(
+            sum(t["amount"] for t in result["taxes"]), 10.0, places=2
+        )
+        self.assertAlmostEqual(result["total_included"], 110.0, places=2)
+
+    def test_multiple_positive_repartition_lines_split_proportionally(self):
+        """Two positive-factor 'tax' repartition lines (70%/30%, still
+        summing to 100%) split a single tax amount across two exposed
+        entries in `compute_all`'s ``taxes`` list, exercising the
+        multi-line branch of the delta-smoothing loop in
+        `_add_accounting_data_to_base_line_tax_details` (the negative-
+        factor test above only ever has one repartition line per sign).
+        """
+        tax = self._create_tax(
+            name="VAT 10% Split 70/30",
+            amount_type="percent",
+            amount=10.0,
+            repartition_line_base_ids=[
+                Command.create(
+                    {
+                        "repartition_type": "tax",
+                        "document_type": "base",
+                        "factor_percent": 70,
+                    }
+                ),
+                Command.create(
+                    {
+                        "repartition_type": "tax",
+                        "document_type": "base",
+                        "factor_percent": 30,
+                    }
+                ),
+            ],
+        )
+        result = tax.compute_all(100.0)
+        amounts = sorted(t["amount"] for t in result["taxes"])
+        self.assertEqual(len(amounts), 2)
+        self.assertAlmostEqual(amounts[0], 3.0, places=2)
+        self.assertAlmostEqual(amounts[1], 7.0, places=2)
+        self.assertAlmostEqual(
+            sum(t["amount"] for t in result["taxes"]), 10.0, places=2
+        )
