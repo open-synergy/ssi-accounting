@@ -31,7 +31,7 @@ class JournalEntryItem(models.Model):
     informational: the tax base for an ``entry``-typed move is
     ``amount_currency``, and ``quantity``/``price_unit``/``discount`` are
     never read by the tax engine -- exactly upstream Odoo 19's own
-    behaviour for ``account.move`` lines of ``move_type == 'entry'``.
+    behaviour for a plain (non-invoice) ``account.move`` line.
     ``_compute_price_unit`` is dropped entirely: ``price_unit`` is a plain,
     directly-typeable field. ``_compute_totals`` mirrors
     ``price_subtotal``/``price_total`` from ``amount_currency`` rather
@@ -104,7 +104,7 @@ class JournalEntryItem(models.Model):
     scope, see the issue's "Dibuang dari baris" list):
     ``analytic_distribution``, ``term_key``, ``epd_*``,
     ``discount_allocation_*``, ``discount_date``, ``deductible_amount``,
-    ``is_refund``, ``move_type``, ``payment_id``, ``statement_line_id``,
+    ``is_refund``, ``payment_id``, ``statement_line_id``,
     ``reconcile_model_id``, ``product_category_id``. Reconciliation
     itself (``reconciled``, ``amount_residual``, ``full_reconcile_id``,
     ``matched_debit_ids``/``matched_credit_ids``) is also out of scope --
