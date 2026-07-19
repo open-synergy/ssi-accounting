@@ -9,10 +9,14 @@ from . import (
     account_root,
     account_tag,
     journal,
+    # 'mixin_sequence_number' MUST be imported before any model that
+    # inherits 'mixin.sequence_number' ('journal_entry' below) -- Odoo
+    # resolves '_inherit' against models already registered at that
+    # point in module-import order, not by dependency graph.
+    mixin_sequence_number,
     journal_entry,
     journal_entry_item,
     journal_group,
-    mixin_sequence_number,
     res_company,
     res_currency,
     tax,
