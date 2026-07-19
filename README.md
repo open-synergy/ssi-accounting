@@ -21,7 +21,7 @@ Available addons
 ----------------
 addon | version | maintainers | summary
 --- | --- | --- | ---
-[ssi_accounting](ssi_accounting/) | 19.0.1.7.0 |  | Accounting
+[ssi_accounting](ssi_accounting/) | 19.0.1.8.0 |  | Accounting
 
 [//]: # (end addons)
 
