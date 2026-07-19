@@ -19,8 +19,9 @@ and its companion ``account.code.mapping``. It also has ``account.journal``/
 ``account.journal.group``, the tax configuration models ``tax_group``,
 ``tax`` and its child ``tax.repartition_line`` (plus their standalone
 computation engine), and the journal entry itself: ``journal_entry`` and its
-child ``journal_entry.item``. Posting, numbering, reconciliation, and wiring
-the tax engine to real journal items are added incrementally by later units.
+child ``journal_entry.item``, including its posting/numbering/state machine.
+Reconciliation, exchange-rate differences, and wiring the tax engine to real
+journal items are added incrementally by later units.
 
 
 Design decisions
@@ -86,9 +87,29 @@ Design decisions
   Keputusan Desain (unlike ``account.journal``/``account.account``, they are
   free to follow the plain-underscore SSI naming convention: nothing in this
   module hardcodes the dotted placeholder name they used to be forward-referenced
-  by). This unit only covers ``draft``: posting, automatic numbering, the state
-  machine, tax line synchronisation, reconciliation, and exchange-rate
-  differences are all separate, later units.
+  by). Tax line synchronisation, reconciliation, and exchange-rate differences
+  remain separate, later units.
+* ``journal_entry`` inherits ``mixin.sequence_number`` (``_sequence_field =
+  "name"``, ``_sequence_date_field = "date"``, ``_sequence_index =
+  "journal_id"``) to get its statutory number: gapless per journal, resetting
+  yearly, assigned only on posting (a draft entry's ``name`` stays empty;
+  ``name_placeholder`` previews it). **A future-dated entry posts
+  immediately instead of being queued** -- unlike upstream Odoo's
+  ``account.move``, ``auto_post``/``soft``-posting and the whole
+  recurring-entry chain are dropped entirely here. The access check
+  ``_post`` performs is ``ssi_accounting.group_accounting_user`` (upstream
+  checks ``account.group_account_invoice``, which cannot exist in a module
+  that never depends on ``account``). Locked accounting dates
+  (``fiscalyear_lock_date``/``tax_lock_date``) are not rejected: exactly
+  like upstream, the entry's date is pushed forward to the next open period
+  and a note is logged on the entry, matching this repo's structured error
+  message convention. ``button_draft`` guards on ``has_reconciled_entries``
+  (forward-declared the same defensive way as ``account.account``'s
+  ``_toggle_reconcile_to_true`` -- always ``False`` until a later
+  reconciliation unit adds the fields it reads) and never clears ``name``.
+  ``made_sequence_gap`` is likewise declared but not maintained by any
+  cascade in this unit -- the exchange-difference posting cascade upstream
+  triggers from ``_post`` is a later multi-currency unit's job.
 * ``amount_total_debit``/``amount_total_credit`` are ``journal_entry``'s only
   aggregate fields -- the whole invoice-flavoured amount block
   (``amount_untaxed``/``amount_tax``/``amount_total``/``amount_residual`` and
