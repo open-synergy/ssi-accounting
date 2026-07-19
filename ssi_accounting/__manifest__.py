@@ -39,6 +39,5 @@
         "views/res_company_views.xml",
         "views/tax_group_views.xml",
         "views/tax_views.xml",
-        "wizards/journal_entry_reversal_views.xml",
     ],
 }

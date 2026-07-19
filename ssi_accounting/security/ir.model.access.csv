@@ -27,4 +27,3 @@ access_tax_all,tax - all,model_tax,base.group_user,1,0,0,0
 access_tax_manager,tax - manager,model_tax,group_accounting_manager,1,1,1,1
 access_tax_repartition_line_all,tax.repartition_line - all,model_tax_repartition_line,base.group_user,1,0,0,0
 access_tax_repartition_line_manager,tax.repartition_line - manager,model_tax_repartition_line,group_accounting_manager,1,1,1,1
-access_journal_entry_reversal_user,journal_entry_reversal - user,model_journal_entry_reversal,group_accounting_user,1,1,1,1
