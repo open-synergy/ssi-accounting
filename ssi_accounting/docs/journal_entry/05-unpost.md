@@ -9,21 +9,9 @@
 
 ## Flow
 
-### Single Record
-
 1. Open the **Accounting > Journal Entries** menu.
 2. Open the Journal Entry record to unpost.
 3. Click the **Reset to Draft** button.
-
-### Bulk (Multiple Records)
-
-1. Open the **Accounting > Journal Entries** menu.
-2. In the list view, open the **Filters** panel and select **Posted** and **Cancelled**
-   together (multiple filters combine as OR) so only records that can be reset are
-   shown.
-3. Select the checkbox of each record to unpost (or use the header checkbox to select
-   all filtered records).
-4. Click the **Reset to Draft** button that appears above the list.
 
 ## Post-Condition
 
@@ -32,11 +20,10 @@
 - **Name** is deliberately kept — the entry retains the statutory number it was given,
   and reuses that same number when it is posted again.
 - The **Post** button becomes available again.
-- When unposted in bulk, every selected record returns to **Draft** in the same action.
 
 ## Note
 
-- If any selected record is not in **Posted** or **Cancelled** status, the system shows
-  an error and none of the selected records are reset.
-- If any selected record has reconciled journal items, the system shows an error and
-  none of the selected records are reset. Remove the reconciliation first.
+- The **Reset to Draft** button is only shown on entries in **Posted** or **Cancelled**
+  status, so a Draft entry offers no way to trigger this action.
+- If the entry has reconciled journal items, the system shows an error and the status is
+  left unchanged. Remove the reconciliation first.
