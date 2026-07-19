@@ -36,7 +36,6 @@ class AccountGroup(models.Model):
     _parent_store = True
 
     parent_id = fields.Many2one(
-        string="Parent",
         comodel_name="account.group",
         index=True,
         ondelete="cascade",
@@ -74,7 +73,6 @@ class AccountGroup(models.Model):
         "Defaults to the starting prefix when left empty.",
     )
     company_id = fields.Many2one(
-        string="Company",
         comodel_name="res.company",
         required=True,
         default=lambda self: self.env.company,

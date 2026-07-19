@@ -38,14 +38,12 @@ class AccountCodeMapping(models.Model):
 
     account_id = fields.Many2one(
         comodel_name="account.account",
-        string="Account",
         compute="_compute_account_id",
         search=True,
         help="Account this code mapping row belongs to.",
     )
     company_id = fields.Many2one(
         comodel_name="res.company",
-        string="Company",
         compute="_compute_company_id",
         readonly=False,
         help="Company this row's code applies to.",

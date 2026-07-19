@@ -177,7 +177,6 @@ class Tax(models.Model):
     )
     tax_group_id = fields.Many2one(
         comodel_name="tax_group",
-        string="Tax Group",
         required=True,
         help="Tax group this tax belongs to, mainly used to derive its "
         "payable/receivable accounts.",
