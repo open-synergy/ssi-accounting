@@ -3,8 +3,6 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 from odoo import Command, api, fields, models
-from odoo.exceptions import ValidationError
-from odoo.tools.float_utils import float_is_zero
 
 TYPE_TAX_USE_SELECTION = [
     ("sale", "Sales"),
@@ -281,47 +279,6 @@ class Tax(models.Model):
                         {"document_type": "reverse", "repartition_type": "tax"}
                     ),
                 ]
-
-    def _check_repartition_line_group_factor(self, lines, group_label):
-        self.ensure_one()
-        tax_lines = lines.filtered(lambda line: line.repartition_type == "tax")
-        total_factor = sum(tax_lines.mapped("factor_percent"))
-        if tax_lines and not float_is_zero(total_factor - 100, precision_digits=2):
-            raise ValidationError(
-                self.env._(
-                    """
-Context: Save tax
-Database ID: %(database_id)s
-Problem: The total factor of the %(group)s repartition lines is
-    %(total)s%%, it must be exactly 100%%
-Solution: Adjust the factor of each %(group)s repartition line so their
-    total equals 100%%
-""",
-                    database_id=self.id,
-                    group=group_label,
-                    total=total_factor,
-                )
-            )
-
-    @api.constrains(
-        "repartition_line_base_ids.factor_percent",
-        "repartition_line_base_ids.repartition_type",
-    )
-    def _check_repartition_line_base_factor(self):
-        for tax in self:
-            tax._check_repartition_line_group_factor(
-                tax.repartition_line_base_ids, "base"
-            )
-
-    @api.constrains(
-        "repartition_line_reverse_ids.factor_percent",
-        "repartition_line_reverse_ids.repartition_type",
-    )
-    def _check_repartition_line_reverse_factor(self):
-        for tax in self:
-            tax._check_repartition_line_group_factor(
-                tax.repartition_line_reverse_ids, "reverse"
-            )
 
     def copy_data(self, default=None):
         default = dict(default or {})

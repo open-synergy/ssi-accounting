@@ -3,6 +3,8 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
+from odoo.tools.float_utils import float_is_zero
 
 
 class TaxRepartitionLine(models.Model):
@@ -31,6 +33,15 @@ class TaxRepartitionLine(models.Model):
     ``ir.model.access`` rows are written together with ``tax``'s own rows
     (see ``security/ir.model.access.csv``), and it is only ever reached
     through ``tax.repartition_line_base_ids``/``repartition_line_reverse_ids``.
+
+    **The 100% factor check lives here, on the child, not on ``tax`` as a
+    dotted ``@api.constrains('repartition_line_base_ids.factor_percent')``.**
+    A dotted constrain on the parent only reliably fires when the O2M
+    field itself is touched from the parent's side; it does not fire when
+    a child record's own field (``factor_percent``) is written directly,
+    which is exactly how these lines get edited (inline editable list on
+    the ``tax`` form, or a plain ``tax.repartition_line`` write). Defining
+    the constrain here, triggered by this model's own fields, covers both.
     """
 
     _name = "tax.repartition_line"
@@ -125,3 +136,35 @@ class TaxRepartitionLine(models.Model):
     def onchange_account_id(self):
         if self.repartition_type == "base":
             self.account_id = False
+
+    @api.constrains("factor_percent", "repartition_type")
+    def _check_repartition_line_factor(self):
+        checked_groups = set()
+        for line in self:
+            group = (line.tax_id.id, line.document_type)
+            if group in checked_groups:
+                continue
+            checked_groups.add(group)
+            siblings = line.tax_id.repartition_line_ids.filtered(
+                lambda sibling, doc=line.document_type: sibling.document_type == doc
+            )
+            tax_lines = siblings.filtered(
+                lambda sibling: sibling.repartition_type == "tax"
+            )
+            total_factor = sum(tax_lines.mapped("factor_percent"))
+            if tax_lines and not float_is_zero(total_factor - 100, precision_digits=2):
+                raise ValidationError(
+                    self.env._(
+                        """
+Context: Save tax repartition line
+Database ID: %(database_id)s
+Problem: The total factor of the %(group)s repartition lines is
+    %(total)s%%, it must be exactly 100%%
+Solution: Adjust the factor of each %(group)s repartition line so their
+    total equals 100%%
+""",
+                        database_id=line.tax_id.id,
+                        group=line.document_type,
+                        total=total_factor,
+                    )
+                )

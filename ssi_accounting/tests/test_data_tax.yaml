@@ -326,7 +326,7 @@ scenarios:
           amount_type: "percent"
           amount: 5.0
           tax_group_id: "REC: group.id"
-      - step: "Search the base tax-type repartition line"
+      - step: "Find the auto-generated base tax-type repartition line"
         action: "search"
         model: "tax.repartition_line"
         domain:
@@ -336,7 +336,7 @@ scenarios:
             ["repartition_type", "=", "tax"],
           ]
         save_as: "base_tax_line"
-        limit: 1
+        expect_count: 1
       - step: "Changing its factor away from 100 is rejected"
         action: "write"
         target: "base_tax_line"
@@ -371,30 +371,21 @@ scenarios:
           code: "FOREIGN1"
           account_type: "income"
           company_ids: [[6, 0, ["REC: company_b.id"]]]
-      - step: "Create the tax under the default company"
+      - step:
+          "Creating a tax whose repartition line uses that foreign account is rejected"
         action: "create"
         model: "tax"
-        save_as: "tax_cross_company"
+        expect_error:
+          type: "UserError"
         values:
           name: "Cross Company Tax"
           amount_type: "percent"
           amount: 5.0
           tax_group_id: "REC: group.id"
-      - step: "Search the base tax-type repartition line"
-        action: "search"
-        model: "tax.repartition_line"
-        domain:
-          [
-            ["tax_id", "=", "REC: tax_cross_company.id"],
-            ["document_type", "=", "base"],
-            ["repartition_type", "=", "tax"],
-          ]
-        save_as: "cross_company_line"
-        limit: 1
-      - step: "Assigning the foreign account is rejected"
-        action: "write"
-        target: "cross_company_line"
-        expect_error:
-          type: "UserError"
-        values:
-          account_id: "REC: foreign_account.id"
+          repartition_line_base_ids:
+            - - 0
+              - 0
+              - repartition_type: "tax"
+                document_type: "base"
+                account_id: "REC: foreign_account.id"
+                factor_percent: 100
