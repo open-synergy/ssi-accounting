@@ -465,10 +465,18 @@ class JournalEntry(models.Model):
     @api.depends("posted_before", "state", "journal_id", "date")
     def _compute_name(self):
         # EXTENDS mixin.sequence_number: assign the number only once
-        # posted -- see the class docstring.
+        # posted -- see the class docstring. Every branch below assigns
+        # 'name' explicitly (even when that means self-reading and
+        # re-writing its current value) -- same self-referential no-op
+        # pattern as 'journal_entry.item._compute_balance'. A record
+        # left without an explicit assignment inside this loop is not
+        # safe to rely on keeping its previous value once 'state' (an
+        # '@api.depends' trigger here) is written, e.g. by
+        # 'button_draft' -- it is not preserved.
         self = self.sorted(lambda move: (move.date, move._origin.id))
         for move in self:
             if move.state == "cancel":
+                move.name = move.name
                 continue
             move_has_name = move.name and move.name != "/"
             if not move.posted_before and not move._sequence_matches_date():
@@ -476,6 +484,8 @@ class JournalEntry(models.Model):
                 continue
             if move.date and not move_has_name and move.state != "draft":
                 move._set_next_sequence()
+            else:
+                move.name = move.name
         self._inverse_name()
 
     def _inverse_name(self):
