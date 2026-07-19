@@ -1365,22 +1365,62 @@ Solution: Adjust the lines' debit/credit so each entry balances to zero,
         written directly -- same split as
         ``tax.repartition_line._check_repartition_line_factor``'s
         docstring already explains for a different model.
+
+        **Skipped while ``create()``/``write()`` are still mid-sync**
+        (flagged via ``skip_check_balanced_constrains``, see those
+        methods): a coordinated multi-line update -- most commonly this
+        unit's own tax resync, which by design touches a base line and
+        its tax line(s) as separate, sequential writes -- is genuinely,
+        transiently unbalanced between those writes. Upstream's own
+        ``_check_balanced`` sidesteps this entirely by being a
+        contextmanager checked once, after the whole operation settles,
+        rather than an eager ``@api.constrains``; ``create()``/``write()``
+        below replicate that by suppressing this eager check during their
+        own sync window and calling ``_check_balanced`` explicitly,
+        exactly once, right after it closes.
         """
+        if self.env.context.get("skip_check_balanced_constrains"):
+            return
         self._check_balanced({"records": self})
 
     @api.model_create_multi
     def create(self, vals_list):
+        """Create, then validate balance once the tax/balancing sync has settled.
+
+        See ``_check_balanced_constrains``'s docstring for why the eager
+        constrain is suppressed (``skip_check_balanced_constrains``) for
+        the duration of ``super().create()`` -- it would otherwise fire
+        mid-sync, while a taxed line's own tax line has not been created
+        yet, and reject a perfectly valid entry over its own transient
+        construction state. ``moves`` is rebound to ``self`` (this
+        method's own, unflagged recordset) before being returned, so the
+        suppression never leaks to the caller.
+        """
         container = {"records": self.env["journal_entry"]}
         with self._sync_dynamic_lines(container):
-            moves = super().create(vals_list)
+            created = super(
+                JournalEntry, self.with_context(skip_check_balanced_constrains=True)
+            ).create(vals_list)
+            moves = self.browse(created.ids)
             container["records"] = moves
+        self._check_balanced({"records": moves})
         return moves
 
     def write(self, vals):
+        """Write, then validate balance once the tax/balancing sync has settled.
+
+        See ``_check_balanced_constrains``'s docstring for why the eager
+        constrain is suppressed (``skip_check_balanced_constrains``) for
+        the duration of ``super().write()``.
+        """
         container = {"records": self}
         if self._disable_recursion(container, "journal_entry_sync_dynamic_lines"):
             return super().write(vals)
         flagged = container["records"]
         with flagged._sync_dynamic_lines(container):
-            result = super(JournalEntry, flagged).write(vals)
+            result = super(
+                JournalEntry,
+                flagged.with_context(skip_check_balanced_constrains=True),
+            ).write(vals)
+        self._check_balanced({"records": self})
         return result

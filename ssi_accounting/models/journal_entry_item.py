@@ -553,10 +553,24 @@ class JournalEntryItem(models.Model):
         Idempotent when 'debit'/'credit'/'amount_currency' were already
         consistent with 'balance' (the common case), so it is safe to
         run unconditionally rather than only for lines missing them.
+
+        **Run under ``skip_check_balanced_constrains``**: this refresh
+        assigns ``line.debit``/``line.credit`` field-by-field, and Odoo's
+        own field setter turns that into a ``write()`` -- reaching this
+        model's ``_check_balanced_constrains`` while a taxed line has
+        just been created but its own tax line has not been synced yet
+        (that only happens afterwards, in ``journal_entry._sync_tax_lines``).
+        Without the flag, that eager, mid-construction check would reject
+        an entry that is only transiently unbalanced, not actually
+        broken -- see ``journal_entry._check_balanced_constrains``'s
+        docstring for the full reasoning. ``records`` itself (returned
+        below) is never rebound to the flagged context, so nothing leaks
+        to the caller.
         """
         records = super().create(vals_list)
-        records._compute_debit_credit()
-        records._compute_amount_currency()
+        refresh = records.with_context(skip_check_balanced_constrains=True)
+        refresh._compute_debit_credit()
+        refresh._compute_amount_currency()
         return records
 
     def write(self, vals):
@@ -589,6 +603,16 @@ class JournalEntryItem(models.Model):
         and skips the redundant nested pass; a write reaching this method
         on its own (the common case -- editing a line directly, e.g. from
         a list view or a test) carries no such flag and syncs normally.
+
+        **Also suppresses ``skip_check_balanced_constrains`` for the
+        duration of ``super().write()``**, then validates balance
+        explicitly, exactly once, right after the sync closes -- same
+        reasoning as ``journal_entry.write()``'s own docstring: a
+        coordinated multi-line write (e.g. a taxed base line and its tax
+        line updated together) is genuinely, transiently unbalanced
+        between the individual child writes the ORM issues one at a
+        time, and the eager constrain would otherwise reject it over
+        that transient state.
         """
         if not vals:
             return True
@@ -599,7 +623,11 @@ class JournalEntryItem(models.Model):
         ):
             return super().write(vals)
         with move_container["records"]._sync_dynamic_lines(move_container):
-            result = super().write(vals)
+            result = super(
+                JournalEntryItem,
+                self.with_context(skip_check_balanced_constrains=True),
+            ).write(vals)
+        moves._check_balanced({"records": moves})
         return result
 
     def _affect_tax_report(self):
@@ -631,6 +659,12 @@ class JournalEntryItem(models.Model):
         that case -- same split as
         ``tax.repartition_line._check_repartition_line_factor``'s
         docstring already explains for a different model.
+
+        **Skipped while ``create()``/``write()`` are still mid-sync**
+        (flagged via ``skip_check_balanced_constrains``) -- see
+        ``journal_entry._check_balanced_constrains``'s docstring for why.
         """
+        if self.env.context.get("skip_check_balanced_constrains"):
+            return
         for move in self.move_id:
             move._check_balanced({"records": move})
