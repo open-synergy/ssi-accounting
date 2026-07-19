@@ -39,7 +39,7 @@ class JournalEntry(models.Model):
     only aggregate fields kept -- for a pure journal entry, total debit and
     total credit are the only aggregates that mean anything.
 
-    **``move_type`` is dropped, along with ``is_entry()``/``is_invoice()``.**
+    **``is_entry()``/``is_invoice()`` are gone too.**
     Those two were kept as shims (returning ``True``/``False``
     respectively) only until the tax synchronisation unit's code ported
     from upstream (behaviour-gated on them) landed; now that it has (see
@@ -403,8 +403,8 @@ class JournalEntry(models.Model):
         # previous entry number to this entry's own journal (matching
         # '_sequence_index'), and to the date range implied by the
         # reset periodicity of the closest reference entry. Adapted
-        # (behaviour-wise, simplified: no move_type/refund/payment/
-        # self-billing concepts, none of which exist in this repo)
+        # (behaviour-wise, simplified: no refund/payment/self-billing
+        # concepts, none of which exist in this repo)
         # from upstream ``account.move._get_last_sequence_domain``.
         self.ensure_one()
         if not self.date or not self.journal_id:
@@ -803,8 +803,8 @@ Solution: The entry is accounted on %(new_date)s instead
     # A posted entry is never corrected in place -- it is mirrored by a
     # reversal entry instead (see the class docstring's rationale and this
     # issue's Keputusan Desain). Ported (behaviour-wise, simplified: no
-    # 'move_type' swap, no invoice-specific default values -- neither
-    # concept exists on this model) from Odoo core
+    # invoice-specific default values -- that concept does not exist on
+    # this model) from Odoo core
     # ``addons/account/models/account_move.py``'s own reversal methods.
     # Driven end-to-end by the 'journal_entry_reversal' wizard
     # (``wizards/journal_entry_reversal.py``); 'action_reverse' below only
@@ -902,9 +902,9 @@ Solution: The entry is accounted on %(new_date)s instead
         """Build create() vals for the mirror entry reversing 'self'.
 
         Ported (behaviour-wise) from Odoo core
-        ``AccountMove._reverse_move_vals``, simplified: no 'move_type'
-        swap (this model has none -- see the class docstring), so
-        'is_refund' is set directly instead, and no invoice-specific
+        ``AccountMove._reverse_move_vals``, simplified: 'is_refund' is
+        set directly (there is no invoice-type flag to swap on this
+        model -- see the class docstring), and no invoice-specific
         vals (payment term, due date, ...) exist to strip.
 
         :param default_values: optional dict overriding 'journal_id'/
@@ -1293,8 +1293,8 @@ Solution: The entry is accounted on %(new_date)s instead
         """Decide how ``_get_rounded_base_and_tax_lines`` should treat this move.
 
         Upstream's own version also takes the changing move itself, to
-        decide (via ``is_invoice()``) whether a bare ``currency_id``/
-        ``move_type`` change alone should force
+        decide (via ``is_invoice()``) whether a bare ``currency_id``
+        change alone should force
         ``round_from_tax_lines = False`` -- unreachable here (see
         ``_sync_tax_lines``'s docstring), so dropped along with the
         ``move`` parameter. It can also return
@@ -1396,10 +1396,10 @@ Solution: The entry is accounted on %(new_date)s instead
         carry ``tax_ids``/``tax_repartition_line_id`` reach this stage at
         all (see ``_sync_dynamic_lines``), a base line is always
         ``display_type == 'product'``, and every ``is_invoice()``-gated
-        branch upstream had (a bare ``currency_id``/``move_type`` change
+        branch upstream had (a bare ``currency_id`` change
         forcing a full recompute, ``price_unit``/``quantity``/``discount``
         as extra tracked fields, ``'reapply_currency_rate'``) is gone --
-        this model has no invoice/move_type concept at all (see the class
+        this model has no invoice-type concept at all (see the class
         docstring). Split into the ``_sync_tax_lines_*`` helper methods
         above purely to keep every individual method under this repo's
         mccabe complexity budget -- a structural deviation from upstream's

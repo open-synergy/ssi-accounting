@@ -17,7 +17,7 @@ class JournalEntryReversal(models.TransientModel):
     Ported (behaviour-wise) from Odoo core
     ``addons/account/wizard/account_move_reversal.py`` (class
     ``AccountMoveReversal``, model ``account.move.reversal``), adapted
-    per this issue's Keputusan Desain: no ``move_type``/invoice concept
+    per this issue's Keputusan Desain: no invoice concept
     exists on ``journal_entry`` (see that model's own docstring), so
     upstream's third ``refund_method`` value (``refund``, specific to
     invoice credit notes) is dropped -- only ``cancel``/``modify`` remain.

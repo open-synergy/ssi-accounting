@@ -139,8 +139,8 @@ Design decisions
   (``amount_untaxed``/``amount_tax``/``amount_total``/``amount_residual`` and
   their ``*_signed`` variants, ``tax_totals``, ``payment_state``, ...) is
   dropped, along with ``auto_post``/recurring entries, the hash chain, and
-  every field prefixed ``invoice_``/``statement_``/``payment_``. ``move_type``
-  is dropped too, along with ``is_entry()``/``is_invoice()``: those two were
+  every field prefixed ``invoice_``/``statement_``/``payment_``.
+  ``is_entry()``/``is_invoice()`` are gone too: those two were
   kept as shims (returning ``True``/``False``) only until the tax
   synchronisation unit's ported code (behaviour-gated on them) landed; now
   that it has, every branch that depended on them was pruned and the shims
@@ -157,8 +157,8 @@ Design decisions
   ``price_subtotal`` (a deliberate product decision), but purely as
   informational fields: the tax base for an ``entry``-typed line is
   ``amount_currency``, never ``quantity * price_unit`` -- exactly upstream
-  Odoo 19's own behaviour for ``account.move`` lines of ``move_type ==
-  'entry'``. ``product_uom_id`` is dropped (safe: ``tax``'s base-line builder
+  Odoo 19's own behaviour for a plain (non-invoice) ``account.move`` line.
+  ``product_uom_id`` is dropped (safe: ``tax``'s base-line builder
   already falls back to ``uom.uom`` when it is absent). ``display_type``
   stays required, shrunk to ``product``/``tax`` -- it is the base line vs.
   tax line discriminator the tax engine relies on. Every
@@ -310,7 +310,7 @@ Design decisions
   wizard (header button "Reverse Entry"), which builds a mirror entry whose lines
   carry the opposite ``balance``/``amount_currency``, linked back through
   ``reversed_entry_id``/``reversal_move_ids``. Unlike upstream ``account.move``,
-  there is no ``move_type`` to swap: the reverse repartition lines are selected
+  there is no invoice-type flag to swap: the reverse repartition lines are selected
   through ``journal_entry.is_refund``, a plain boolean the wizard sets explicitly
   on the mirror entry -- never derived from ``state`` or any document-type concept.
   ``refund_method`` on the wizard keeps only ``cancel``/``modify`` (upstream's third
