@@ -465,46 +465,24 @@ class JournalEntry(models.Model):
     @api.depends("posted_before", "state", "journal_id", "date")
     def _compute_name(self):
         # EXTENDS mixin.sequence_number: assign the number only once
-        # posted -- see the class docstring.
-        #
-        # 'name' is triggered here by 'state' (an unrelated field, so
-        # this compute reruns on every 'button_draft'/'action_post'
-        # cycle, not just the first time), yet this method itself needs
-        # to know whether 'name' *already* has a value in the database
-        # to decide whether to leave it alone. Reading 'move.name'
-        # (plain ORM access) while 'name' is itself mid-recompute
-        # returns the field's empty value, not what is actually stored
-        # -- Odoo's recursion guard, not a stale-cache problem
-        # 'auto_refresh'-style fixes address. Read the persisted column
-        # directly instead, exactly like this mixin's own
-        # '_get_last_sequence' bypasses the ORM cache for the same
-        # reason (see 'mixin_sequence_number.py'). No flush is needed
-        # first: 'name' is either still NULL from 'create()'s INSERT,
-        # or was last written by '_set_next_sequence()' -> ultimately
-        # '_locked_increment()', which updates it with a direct SQL
-        # UPDATE rather than through the ORM, so the database is
-        # already authoritative for it.
+        # posted -- see the class docstring. Ported (behaviour-wise)
+        # verbatim from upstream ``AccountMove._compute_name``: a
+        # record whose branch does not reassign 'name' here keeps its
+        # existing value. That is only actually safe for callers that
+        # write 'state' without 'name' already carrying a real number
+        # -- 'button_draft'/'button_cancel'/re-posting all go through
+        # '_write_state' instead of a plain 'write({"state": ...})' for
+        # that exact reason; see its docstring.
         self = self.sorted(lambda move: (move.date, move._origin.id))
-        stored_names = {}
-        if self.ids:
-            self.env.cr.execute(
-                "SELECT id, name FROM journal_entry WHERE id IN %(ids)s",
-                {"ids": tuple(self.ids)},
-            )
-            stored_names = dict(self.env.cr.fetchall())
         for move in self:
-            stored_name = stored_names.get(move.id)
             if move.state == "cancel":
-                move.name = stored_name
                 continue
-            move_has_name = bool(stored_name) and stored_name != "/"
+            move_has_name = move.name and move.name != "/"
             if not move.posted_before and not move._sequence_matches_date():
                 move.name = False
                 continue
             if move.date and not move_has_name and move.state != "draft":
                 move._set_next_sequence()
-            else:
-                move.name = stored_name
         self._inverse_name()
 
     def _inverse_name(self):
@@ -690,7 +668,7 @@ Solution: The entry is accounted on %(new_date)s instead
             )
             move.date = new_date
 
-        self.write({"state": "posted", "posted_before": True})
+        self._write_state("posted", extra_vals={"posted_before": True})
         return self
 
     def button_draft(self):
@@ -701,7 +679,8 @@ Solution: The entry is accounted on %(new_date)s instead
         'has_reconciled_entries', see that field's own help text).
         Drops the hash/secured guard (no hash chain here) and every
         payment/bank-statement cascade (no such documents here).
-        'name' is deliberately left untouched -- see its own help text.
+        'name' is deliberately left untouched -- see its own help text
+        and '_write_state'\'s docstring for how that is enforced.
         """
         if any(move.state not in ("cancel", "posted") for move in self):
             raise UserError(
@@ -716,7 +695,7 @@ Solution: The entry is accounted on %(new_date)s instead
                     "reconciled entries."
                 )
             )
-        self.write({"state": "draft"})
+        self._write_state("draft")
 
     def button_cancel(self):
         """Cancel 'self', from either 'draft' or 'posted'.
@@ -733,7 +712,35 @@ Solution: The entry is accounted on %(new_date)s instead
             raise UserError(
                 self.env._("Only draft or posted journal entries can be cancelled.")
             )
-        self.write({"state": "cancel"})
+        self._write_state("cancel")
+
+    def _write_state(self, state, extra_vals=None):
+        """Write 'state' (plus 'extra_vals') without losing 'name'.
+
+        'name' depends on 'state' (see '_compute_name') purely so
+        posting can assign it -- once a move already carries a real
+        number, a *later* 'state' write (draft/cancel, or re-posting)
+        must never touch it again. Re-triggering '_compute_name' for a
+        record that already has a number is exactly that: harmless in
+        principle ('_compute_name' falls through to preserving it), but
+        Odoo's recompute-in-progress guard makes 'move.name' read back
+        empty while the field is being recomputed, even for a plain
+        self-referential re-assignment -- so leaving 'name' out of
+        `vals` here is not safe to rely on. Writing it back explicitly,
+        alongside 'state', in the *same* call protects it from ever
+        being marked "to compute" in the first place (Odoo never
+        recomputes a field whose value was just given directly).
+        Records with no number yet (a fresh 'draft' being posted for
+        the first time) are written in a separate, plain call instead,
+        so '_compute_name' still gets to run and number them.
+        """
+        vals = {"state": state, **(extra_vals or {})}
+        already_numbered = self.filtered(lambda move: move.name)
+        unnumbered = self - already_numbered
+        for move in already_numbered:
+            move.write({**vals, "name": move.name})
+        if unnumbered:
+            unnumbered.write(vals)
 
     def is_entry(self):
         """Shim: every journal entry in this repo is a plain entry.
