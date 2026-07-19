@@ -64,19 +64,27 @@ class AccountAccount(models.Model):
     expensive migration (new join table + ``code`` backfill into
     ``code_store``), so it must be right from the start.
 
-    **Forward references to models that do not exist yet in this repo**
-    (``account.move.line``, ``account.journal``) are guarded with
-    ``"<model>" not in self.env`` / ``"<field>" in self._fields`` checks,
-    exactly like ``account_group.py``'s
+    **Forward references to models that did not exist yet in this repo**
+    are guarded with ``"<model>" not in self.env`` /
+    ``"<field>" in self._fields`` checks, exactly like ``account_group.py``'s
     ``_adapt_accounts_for_account_groups`` and ``res_currency.py``'s
-    ``_has_accounting_entries`` already do. Each guard is a no-op today
-    and starts doing real work the moment the corresponding unit lands,
-    with no further change needed here:
+    ``_has_accounting_entries`` already do.
 
-    - ``account.move.line`` (journal items): ``used``, ``current_balance``,
-      ``_toggle_reconcile_to_true``/``_toggle_reconcile_to_false``,
-      ``_unlink_except_contains_journal_items``, the journal-item leg of
-      ``_check_company_consistency``.
+    **``journal_entry.item`` now exists** (added by the journal entry
+    unit; these guards were originally written against the placeholder
+    name ``account.move.line`` before that unit's Keputusan Desain
+    settled on ``journal_entry.item``): ``used``, ``current_balance``,
+    ``_unlink_except_contains_journal_items``, and the journal-item leg
+    of ``_check_company_consistency`` now work for real. **Two guards
+    stay no-ops on purpose**, because their fields are still out of
+    scope (reconciliation -- see the journal entry issue's "Tidak
+    termasuk"): ``_toggle_reconcile_to_true``/``_toggle_reconcile_to_false``
+    are guarded on ``"reconciled" not in``
+    ``self.env["journal_entry.item"]._fields`` (not merely on the
+    model's presence), the same field-precision pattern
+    ``_onchange_account_type`` below already uses for ``tax_ids``, and
+    will start working the moment a later reconciliation unit adds that
+    field.
     - ``account.journal``: ``_check_journal_consistency`` (trimmed to the
       journal/account currency mismatch check; upstream's extra
       ``account.payment.method`` branches are dropped -- no payment method
@@ -376,11 +384,11 @@ Solution: Assign a single company to this account
                     database_id=",".join(str(i) for i in self.ids),
                 )
             )
-        if "account.move.line" not in self.env:
+        if "journal_entry.item" not in self.env:
             return
         for companies, accounts in self.grouped(lambda a: a.company_ids).items():
             if (
-                self.env["account.move.line"]
+                self.env["journal_entry.item"]
                 .sudo()
                 .search_count(
                     [
@@ -601,14 +609,14 @@ Solution: Align the account currency with its journal's currency
             account.group_id = group_by_code[account.code]
 
     def _get_used_account_ids(self):
-        if "account.move.line" not in self.env:
+        if "journal_entry.item" not in self.env:
             return []
         rows = self.env.execute_query(
             SQL(
                 """
                 SELECT acc.id FROM account_account acc
                 WHERE EXISTS (
-                    SELECT 1 FROM account_move_line aml
+                    SELECT 1 FROM journal_entry_item aml
                     WHERE aml.account_id = acc.id LIMIT 1
                 )
                 """
@@ -690,12 +698,12 @@ Solution: Set the account code manually
 
     @api.depends_context("company")
     def _compute_current_balance(self):
-        if "account.move.line" not in self.env:
+        if "journal_entry.item" not in self.env:
             self.current_balance = 0
             return
         balances = {
             account.id: balance
-            for account, balance in self.env["account.move.line"]._read_group(
+            for account, balance in self.env["journal_entry.item"]._read_group(
                 domain=[
                     ("account_id", "in", self.ids),
                     ("parent_state", "=", "posted"),
@@ -913,9 +921,9 @@ Solution: Set the account code manually
             else:
                 self.filtered(lambda r: r.reconcile)._toggle_reconcile_to_false()
 
-        if vals.get("currency_id") and "account.move.line" in self.env:
+        if vals.get("currency_id") and "journal_entry.item" in self.env:
             for account in self:
-                if self.env["account.move.line"].search_count(
+                if self.env["journal_entry.item"].search_count(
                     [
                         ("account_id", "=", account.id),
                         ("currency_id", "not in", (False, vals["currency_id"])),
@@ -1031,15 +1039,28 @@ Solution: Choose a unique code for each account within the company
         """Toggle 'reconcile' False -> True.
 
         Lines with debit = credit = amount_currency = 0 are set reconciled.
-        Guarded on ``account.move.line``, which does not exist yet.
+
+        ``journal_entry.item`` (the model this used to forward-reference
+        as the placeholder name ``account.move.line``) now exists, but
+        without any reconciliation fields (``reconciled``,
+        ``amount_residual``, ``amount_residual_currency``,
+        ``full_reconcile_id``) -- reconciliation is out of scope for the
+        journal entry issue that added it (see that issue's "Tidak
+        termasuk"). So this stays guarded, precisely on the field this
+        query needs rather than on the model's mere presence -- same
+        pattern as ``_onchange_account_type``'s ``"tax_ids" in
+        self._fields`` guard below. Starts working, table name included,
+        the moment a later reconciliation unit adds those fields.
         """
-        if not self.ids or "account.move.line" not in self.env:
+        if not self.ids or "journal_entry.item" not in self.env:
             return None
-        self.env["account.move.line"].invalidate_model(
+        if "reconciled" not in self.env["journal_entry.item"]._fields:
+            return None
+        self.env["journal_entry.item"].invalidate_model(
             ["amount_residual", "amount_residual_currency", "reconciled"]
         )
         query = """
-            UPDATE account_move_line SET
+            UPDATE journal_entry_item SET
                 reconciled = CASE WHEN debit = 0 AND credit = 0 AND amount_currency = 0
                     THEN true ELSE false END,
                 amount_residual = (debit-credit),
@@ -1052,11 +1073,14 @@ Solution: Choose a unique code for each account within the company
         """Toggle 'reconcile' True -> False.
 
         Disallowed if some lines are partially reconciled. Guarded on
-        ``account.move.line``, which does not exist yet.
+        ``"reconciled" not in self.env["journal_entry.item"]._fields`` --
+        see ``_toggle_reconcile_to_true``'s docstring for why.
         """
-        if not self.ids or "account.move.line" not in self.env:
+        if not self.ids or "journal_entry.item" not in self.env:
             return None
-        partial_lines_count = self.env["account.move.line"].search_count(
+        if "reconciled" not in self.env["journal_entry.item"]._fields:
+            return None
+        partial_lines_count = self.env["journal_entry.item"].search_count(
             [
                 ("account_id", "in", self.ids),
                 ("full_reconcile_id", "=", False),
@@ -1078,11 +1102,11 @@ Solution: Fully reconcile or unreconcile those items first
                 )
             )
 
-        self.env["account.move.line"].invalidate_model(
+        self.env["journal_entry.item"].invalidate_model(
             ["amount_residual", "amount_residual_currency"]
         )
         query = """
-            UPDATE account_move_line
+            UPDATE journal_entry_item
                 SET amount_residual = 0, amount_residual_currency = 0
             WHERE full_reconcile_id IS NULL AND account_id IN %s
         """
@@ -1090,10 +1114,10 @@ Solution: Fully reconcile or unreconcile those items first
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_contains_journal_items(self):
-        if "account.move.line" not in self.env:
+        if "journal_entry.item" not in self.env:
             return
         if (
-            self.env["account.move.line"]
+            self.env["journal_entry.item"]
             .sudo()
             .search_count([("account_id", "in", self.ids)], limit=1)
         ):
