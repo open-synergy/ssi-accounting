@@ -1,0 +1,92 @@
+scenarios:
+  - name: "Create a journal group excluding one journal"
+    steps:
+      - step: "Create a journal to exclude"
+        action: "create"
+        model: "account.journal"
+        save_as: "excluded_journal"
+        values:
+          name: "Excluded Journal"
+          type: "general"
+      - step: "Create a journal group excluding it"
+        action: "create"
+        model: "account.journal.group"
+        save_as: "group"
+        values:
+          name: "My Journal Group"
+          excluded_journal_ids: [[6, 0, ["REC: excluded_journal.id"]]]
+      - step: "Assert the journal group excludes that journal"
+        action: "assert"
+        target: "group"
+        asserts:
+          excluded_journal_ids:
+            type: "m2m"
+            check: "exact"
+            expected_records:
+              - "REC: excluded_journal"
+
+  - name: "Edit a journal group's name"
+    steps:
+      - step: "Create journal group"
+        action: "create"
+        model: "account.journal.group"
+        save_as: "group"
+        values:
+          name: "Original Group Name"
+      - step: "Rename the journal group"
+        action: "write"
+        target: "group"
+        values:
+          name: "Renamed Group"
+      - step: "Assert name updated"
+        action: "assert"
+        target: "group"
+        asserts:
+          name:
+            type: "value"
+            expected: "Renamed Group"
+
+  - name: "Delete a journal group"
+    steps:
+      - step: "Create journal group"
+        action: "create"
+        model: "account.journal.group"
+        save_as: "group"
+        values:
+          name: "To Delete"
+      - step: "Delete the journal group"
+        action: "unlink"
+        target: "group"
+      - step: "Verify it is gone"
+        action: "search"
+        model: "account.journal.group"
+        domain: [["name", "=", "To Delete"]]
+        save_as: "result"
+        expect_count: 0
+
+  - name: "Excluding a journal from a different company is rejected"
+    steps:
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_b"
+        values:
+          name: "Second Company"
+      - step: "Create a journal in the second company"
+        action: "create"
+        model: "account.journal"
+        save_as: "other_company_journal"
+        context:
+          allowed_company_ids: ["REC: company_b.id"]
+        values:
+          name: "Other Company Journal"
+          type: "general"
+          company_id: "REC: company_b.id"
+      - step: "Excluding it from a journal group in the default company is rejected"
+        action: "create"
+        model: "account.journal.group"
+        expect_error:
+          type: "UserError"
+        values:
+          name: "Cross Company Group"
+          excluded_journal_ids: [[6, 0, ["REC: other_company_journal.id"]]]

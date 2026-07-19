@@ -8,6 +8,8 @@ from . import (
     account_group,
     account_root,
     account_tag,
+    journal,
+    journal_group,
     mixin_sequence_number,
     res_company,
     res_currency,

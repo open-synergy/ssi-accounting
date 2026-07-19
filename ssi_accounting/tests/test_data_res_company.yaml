@@ -33,3 +33,61 @@ scenarios:
           tax_lock_date:
             type: "value"
             expected: 2026-01-15
+
+  - name: "Fill currency exchange and suspense account configuration on the company"
+    steps:
+      - step: "Create a general journal for exchange differences"
+        action: "create"
+        model: "account.journal"
+        save_as: "exchange_journal"
+        values:
+          name: "Exchange Difference"
+          type: "general"
+      - step: "Create a gain exchange rate account"
+        action: "create"
+        model: "account.account"
+        save_as: "gain_acc"
+        values:
+          name: "Gain Exchange Rate"
+          account_type: "income_other"
+          code: "710000"
+      - step: "Create a loss exchange rate account"
+        action: "create"
+        model: "account.account"
+        save_as: "loss_acc"
+        values:
+          name: "Loss Exchange Rate"
+          account_type: "expense_other"
+          code: "810000"
+      - step: "Create a journal suspense account"
+        action: "create"
+        model: "account.account"
+        save_as: "suspense_acc"
+        values:
+          name: "Journal Suspense"
+          account_type: "asset_current"
+          code: "199998"
+      - step: "Write the four currency exchange/suspense fields"
+        action: "write"
+        target: "company"
+        values:
+          currency_exchange_journal_id: "REC: exchange_journal.id"
+          income_currency_exchange_account_id: "REC: gain_acc.id"
+          expense_currency_exchange_account_id: "REC: loss_acc.id"
+          account_journal_suspense_account_id: "REC: suspense_acc.id"
+      - step: "Assert the four fields were saved"
+        action: "assert"
+        target: "company"
+        asserts:
+          currency_exchange_journal_id:
+            type: "m2o"
+            expected: "REC: exchange_journal"
+          income_currency_exchange_account_id:
+            type: "m2o"
+            expected: "REC: gain_acc"
+          expense_currency_exchange_account_id:
+            type: "m2o"
+            expected: "REC: loss_acc"
+          account_journal_suspense_account_id:
+            type: "m2o"
+            expected: "REC: suspense_acc"

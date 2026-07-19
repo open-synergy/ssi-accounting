@@ -1,0 +1,158 @@
+scenarios:
+  - name: "Two journals created without a code get different auto-generated codes"
+    steps:
+      - step: "Create first journal without a code"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_1"
+        values:
+          name: "Journal One"
+          type: "general"
+      - step: "Assert a 5-character code was auto-generated"
+        action: "assert"
+        target: "journal_1"
+        asserts:
+          code:
+            type: "value"
+            operator: "is_truthy"
+      - step: "Create second journal without a code"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_2"
+        values:
+          name: "Journal Two"
+          type: "general"
+      - step: "Assert the second journal's code differs from the first"
+        action: "assert"
+        target: "journal_2"
+        asserts:
+          code:
+            type: "value"
+            operator: "not_equals"
+            expected: "REC: journal_1.code"
+
+  - name: "Creating a journal without a default account auto-creates one"
+    steps:
+      - step: "Create journal without default_account_id"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Miscellaneous Operations"
+          type: "general"
+      - step: "Assert default_account_id was auto-created"
+        action: "assert"
+        target: "journal"
+        asserts:
+          default_account_id:
+            type: "value"
+            operator: "is_truthy"
+
+  - name: "entry_count is zero on a new journal"
+    steps:
+      - step: "Create journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Situation Journal"
+          type: "situation"
+      - step: "Assert entry_count is zero (account.move does not exist yet)"
+        action: "assert"
+        target: "journal"
+        asserts:
+          entry_count:
+            type: "value"
+            expected: 0
+
+  - name: "suspense_account_id falls back to the company's configured suspense account"
+    steps:
+      - step: "Create an account to use as the company's suspense account"
+        action: "create"
+        model: "account.account"
+        save_as: "suspense_acc"
+        values:
+          name: "Suspense"
+          account_type: "asset_current"
+          code: "199999"
+      - step: "Configure the company's suspense account"
+        action: "write"
+        target: "company"
+        values:
+          account_journal_suspense_account_id: "REC: suspense_acc.id"
+      - step: "Create journal without suspense_account_id"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "General Journal"
+          type: "general"
+      - step: "Assert suspense_account_id defaulted from the company"
+        action: "assert"
+        target: "journal"
+        asserts:
+          suspense_account_id:
+            type: "m2o"
+            expected: "REC: suspense_acc"
+
+  - name: "Default account of a journal cannot be a Receivable/Payable account"
+    steps:
+      - step: "Create a receivable account"
+        action: "create"
+        model: "account.account"
+        save_as: "receivable_acc"
+        values:
+          name: "Receivable"
+          account_type: "asset_receivable"
+          code: "110000"
+      - step: "Creating a journal with that account as default is rejected"
+        action: "create"
+        model: "account.journal"
+        expect_error:
+          type: "ValidationError"
+          message_contains: "Receivable"
+        values:
+          name: "Bad Journal"
+          type: "general"
+          default_account_id: "REC: receivable_acc.id"
+
+  - name: "Edit a journal's name"
+    steps:
+      - step: "Create journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Original Name"
+          type: "general"
+      - step: "Rename the journal"
+        action: "write"
+        target: "journal"
+        values:
+          name: "Renamed Journal"
+      - step: "Assert name updated"
+        action: "assert"
+        target: "journal"
+        asserts:
+          name:
+            type: "value"
+            expected: "Renamed Journal"
+
+  - name: "Delete a journal"
+    steps:
+      - step: "Create journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "To Delete"
+          type: "general"
+      - step: "Delete the journal"
+        action: "unlink"
+        target: "journal"
+      - step: "Verify it is gone"
+        action: "search"
+        model: "account.journal"
+        domain: [["name", "=", "To Delete"]]
+        save_as: "result"
+        expect_count: 0

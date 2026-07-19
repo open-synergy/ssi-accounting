@@ -9,3 +9,7 @@ access_account_account_all,account.account - all,model_account_account,base.grou
 access_account_account_manager,account.account - manager,model_account_account,group_accounting_manager,1,1,1,1
 access_account_code_mapping_all,account.code.mapping - all,model_account_code_mapping,base.group_user,1,0,0,0
 access_account_code_mapping_manager,account.code.mapping - manager,model_account_code_mapping,group_accounting_manager,1,1,1,1
+access_account_journal_all,account.journal - all,model_account_journal,base.group_user,1,0,0,0
+access_account_journal_manager,account.journal - manager,model_account_journal,group_accounting_manager,1,1,1,1
+access_account_journal_group_all,account.journal.group - all,model_account_journal_group,base.group_user,1,0,0,0
+access_account_journal_group_manager,account.journal.group - manager,model_account_journal_group,group_accounting_manager,1,1,1,1

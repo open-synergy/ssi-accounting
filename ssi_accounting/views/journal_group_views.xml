@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="journal_group_view_search" model="ir.ui.view">
+        <field name="name">account.journal.group - search</field>
+        <field name="model">account.journal.group</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" />
+                <field name="company_id" />
+                <!-- Group By -->
+                <group>
+                    <filter
+                        name="group_by_company"
+                        string="Company"
+                        context="{'group_by': 'company_id'}"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="journal_group_view_list" model="ir.ui.view">
+        <field name="name">account.journal.group - list</field>
+        <field name="model">account.journal.group</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="company_id" groups="base.group_multi_company" />
+            </list>
+        </field>
+    </record>
+
+    <record id="journal_group_view_form" model="ir.ui.view">
+        <field name="name">account.journal.group - form</field>
+        <field name="model">account.journal.group</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group name="main_group">
+                        <field name="name" />
+                        <field name="company_id" groups="base.group_multi_company" />
+                        <field
+                            name="excluded_journal_ids"
+                            widget="many2many_tags"
+                            domain="[('company_id', '=', company_id)]"
+                        />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="journal_group_action" model="ir.actions.act_window">
+        <field name="name">Journal Groups</field>
+        <field name="res_model">account.journal.group</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem
+        id="journal_group_menu"
+        parent="menu_accounting_configuration"
+        action="journal_group_action"
+        sequence="40"
+    />
+</odoo>
