@@ -19,9 +19,10 @@ and its companion ``account.code.mapping``. It also has ``account.journal``/
 ``account.journal.group``, the tax configuration models ``tax_group``,
 ``tax`` and its child ``tax.repartition_line`` (plus their standalone
 computation engine), and the journal entry itself: ``journal_entry`` and its
-child ``journal_entry.item``, including its posting/numbering/state machine.
-Reconciliation, exchange-rate differences, and wiring the tax engine to real
-journal items are added incrementally by later units.
+child ``journal_entry.item``, including its posting/numbering/state machine
+and the synchronisation that turns a taxed line into real tax journal items.
+Reconciliation and exchange-rate differences are added incrementally by
+later units.
 
 
 Design decisions
@@ -87,8 +88,7 @@ Design decisions
   Keputusan Desain (unlike ``account.journal``/``account.account``, they are
   free to follow the plain-underscore SSI naming convention: nothing in this
   module hardcodes the dotted placeholder name they used to be forward-referenced
-  by). Tax line synchronisation, reconciliation, and exchange-rate differences
-  remain separate, later units.
+  by). Reconciliation and exchange-rate differences remain separate, later units.
 * ``journal_entry`` inherits ``mixin.sequence_number`` (``_sequence_field =
   "name"``, ``_sequence_date_field = "date"``, ``_sequence_index =
   "journal_id"``) to get its statutory number: gapless per journal, resetting
@@ -116,9 +116,11 @@ Design decisions
   their ``*_signed`` variants, ``tax_totals``, ``payment_state``, ...) is
   dropped, along with ``auto_post``/recurring entries, the hash chain, and
   every field prefixed ``invoice_``/``statement_``/``payment_``. ``move_type``
-  is dropped too; ``is_entry()``/``is_invoice()`` are kept as shims (returning
-  ``True``/``False``) only so ported code compiles, and **must be deleted**
-  once the tax synchronisation unit lands.
+  is dropped too, along with ``is_entry()``/``is_invoice()``: those two were
+  kept as shims (returning ``True``/``False``) only until the tax
+  synchronisation unit's ported code (behaviour-gated on them) landed; now
+  that it has, every branch that depended on them was pruned and the shims
+  themselves were deleted.
 * ``journal_entry.item`` keeps ``product_id``/``quantity``/``price_unit``/
   ``price_subtotal`` (a deliberate product decision), but purely as
   informational fields: the tax base for an ``entry``-typed line is
@@ -210,10 +212,11 @@ Design decisions
 * ``tax_group``, ``tax`` and its child ``tax.repartition_line`` are ported
   (behaviour-wise) from Odoo core's ``account.tax.group``/``account.tax``/
   ``account.tax.repartition.line``, because those models live inside the
-  ``account`` module, which ``ssi_accounting`` must not depend on. This unit is
-  **configuration only** — no ``compute_all``/tax-computation engine, no
-  synchronisation of tax lines on a journal entry, and no fiscal
-  position/cash basis/tax closing/tax report; those are separate, later units.
+  ``account`` module, which ``ssi_accounting`` must not depend on. Their
+  configuration, ``compute_all``/tax-computation engine, and the
+  synchronisation that turns a taxed ``journal_entry.item`` into real tax
+  lines (see the ``journal_entry`` bullet above) are all in place; fiscal
+  position/cash basis/tax closing/tax report remain separate, later units.
 * Upstream's invoice-flavoured vocabulary is neutralised throughout, per this
   unit's binding design decision: ``invoice_repartition_line_ids`` →
   ``repartition_line_base_ids``, ``refund_repartition_line_ids`` →
@@ -245,6 +248,34 @@ Design decisions
   (tax closing entry, out of scope), ``pos_receipt_label`` (no Point of Sale
   integration). Dropped from ``account.tax.repartition.line``:
   ``use_in_tax_closing`` (same reason as ``advance_tax_payment_account_id``).
+* Setting ``tax_ids`` on a ``product``-typed ``journal_entry.item`` now
+  creates/updates/deletes matching ``tax``-typed lines automatically, ported
+  (behaviour-wise) from upstream ``account.move``/``account.move.line``'s
+  ``_sync_tax_lines`` and its ``_get_rounded_base_and_tax_lines``/
+  ``_prepare_product_base_line_for_taxes_computation``/
+  ``_prepare_tax_line_for_taxes_computation`` supporting cast.
+  ``journal_entry``'s sync stack (``_sync_dynamic_lines``) grew a second
+  stage alongside the existing auto-balancing one, entered so the tax
+  stage's new/updated/deleted lines exist before the balance is
+  recomputed. ``journal_entry.item`` gained a ``write()`` override (with
+  the same recursion guard ``journal_entry.write()`` uses) purely so
+  editing a line directly -- the only way this repo's own form edits an
+  existing row -- also triggers the sync; upstream needs the equivalent
+  override on ``account.move.line`` for the same reason.
+* ``quantity``/``price_unit``/``discount`` never drive the tax base: a
+  ``journal_entry.item``'s ``amount_currency`` is always what upstream
+  calls the ``'total_excluded'`` base, and ``sign`` is always ``1`` --
+  neither this repo's tax engine nor its journal entry model has an
+  invoice-direction concept to derive a sign from. As a direct
+  consequence, a ``price_include_override="tax_included"`` tax is
+  computed **as if excluded** here (the amount typed is always net of
+  tax, added on top), never extracted from a tax-inclusive gross figure.
+* ``tax._prepare_tax_line_for_taxes_computation`` (the engine-side
+  counterpart of the pre-existing ``_prepare_base_line_for_taxes_computation``,
+  for an *existing* tax line rather than a base line) is added by this
+  unit -- the prior tax-computation-engine unit deliberately left it
+  unported, since nothing yet produced "existing tax line" dicts for it
+  to convert; this unit is that first consumer.
 
 
 Installation

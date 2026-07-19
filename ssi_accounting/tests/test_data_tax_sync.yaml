@@ -1,0 +1,1000 @@
+options:
+  auto_refresh: true
+
+scenarios:
+  - name: "Applying an 11% tax to a debit line creates a matching tax line"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 1"
+      - step: "Create the VAT payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "vat_account"
+        values:
+          name: "VAT Payable 1"
+          account_type: "liability_current"
+          code: "TS1001"
+      - step: "Create a tax grid tag"
+        action: "create"
+        model: "account.tag"
+        save_as: "vat_tag"
+        values:
+          name: "+VAT 1"
+          applicability: "taxes"
+      - step: "Create VAT 11% with an explicit repartition account/tag"
+        action: "create"
+        model: "tax"
+        save_as: "vat11"
+        values:
+          name: "VAT 11% (Sync 1)"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: vat_group.id"
+          repartition_line_base_ids:
+            - - 0
+              - 0
+              - document_type: "base"
+                repartition_type: "base"
+            - - 0
+              - 0
+              - document_type: "base"
+                repartition_type: "tax"
+                account_id: "REC: vat_account.id"
+                tag_ids:
+                  - - 6
+                    - 0
+                    - - "REC: vat_tag.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 1"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 1"
+          account_type: "expense"
+          code: "TS1002"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 1"
+          account_type: "liability_current"
+          code: "TS1003"
+      - step: "Create an entry with a taxed debit line"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 1000000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: vat11.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -1110000.0
+      - step: "Find the generated tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
+        save_as: "tax_line"
+        expect_count: 1
+      - step: "Assert the tax line's amount, account and tags"
+        action: "assert"
+        target: "tax_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: 110000.0
+          amount_currency:
+            type: "value"
+            expected: 110000.0
+          account_id:
+            type: "m2o"
+            expected: "REC: vat_account"
+          tax_tag_ids:
+            type: "m2m"
+            check: "exact"
+            expected_records:
+              - "REC: vat_tag"
+          tax_base_amount:
+            type: "value"
+            expected: 1000000.0
+
+  - name: "Changing the base line amount resynchronises the tax line"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 2"
+      - step: "Create VAT 11%"
+        action: "create"
+        model: "tax"
+        save_as: "vat11"
+        values:
+          name: "VAT 11% (Sync 2)"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 2"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 2"
+          account_type: "expense"
+          code: "TS2001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 2"
+          account_type: "liability_current"
+          code: "TS2002"
+      - step: "Create an entry with a taxed debit line"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 1000000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: vat11.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -1110000.0
+      - step: "Find the debit (base) line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["move_id", "=", "REC: entry.id"],
+            ["account_id", "=", "REC: acc_expense.id"],
+          ]
+        save_as: "base_line"
+        limit: 1
+      - step: "Find the payable (credit) line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["move_id", "=", "REC: entry.id"],
+            ["account_id", "=", "REC: acc_payable.id"],
+          ]
+        save_as: "credit_line"
+        limit: 1
+      - step: "Double the base amount and rebalance the credit line"
+        action: "write"
+        target: "entry"
+        values:
+          line_ids:
+            - - 1
+              - "REC: base_line.id"
+              - balance: 2000000.0
+            - - 1
+              - "REC: credit_line.id"
+              - balance: -2220000.0
+      - step: "Find the resynced tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
+        save_as: "tax_line"
+        expect_count: 1
+      - step: "Assert the tax line follows the new base"
+        action: "assert"
+        target: "tax_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: 220000.0
+          tax_base_amount:
+            type: "value"
+            expected: 2000000.0
+
+  - name: "Removing the tax from a base line deletes its tax line and clears its tags"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 3"
+      - step: "Create VAT 11%"
+        action: "create"
+        model: "tax"
+        save_as: "vat11"
+        values:
+          name: "VAT 11% (Sync 3)"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 3"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 3"
+          account_type: "expense"
+          code: "TS3001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 3"
+          account_type: "liability_current"
+          code: "TS3002"
+      - step: "Create an entry with a taxed debit line"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 1000000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: vat11.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -1110000.0
+      - step: "Find the debit (base) line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["move_id", "=", "REC: entry.id"],
+            ["account_id", "=", "REC: acc_expense.id"],
+          ]
+        save_as: "base_line"
+        limit: 1
+      - step: "Find the payable (credit) line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["move_id", "=", "REC: entry.id"],
+            ["account_id", "=", "REC: acc_payable.id"],
+          ]
+        save_as: "credit_line"
+        limit: 1
+      - step: "Clear the tax and rebalance the credit line"
+        action: "write"
+        target: "entry"
+        values:
+          line_ids:
+            - - 1
+              - "REC: base_line.id"
+              - tax_ids:
+                  - - 5
+                    - 0
+                    - 0
+            - - 1
+              - "REC: credit_line.id"
+              - balance: -1000000.0
+      - step: "Verify the tax line no longer exists"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
+        save_as: "orphan_tax_lines"
+        expect_count: 0
+      - step: "Assert the base line's tags were cleared"
+        action: "assert"
+        target: "base_line"
+        asserts:
+          tax_tag_ids:
+            type: "m2m"
+            check: "exact"
+            expected_records: []
+
+  - name: "A tax group with two children creates one tax line per child"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 4"
+      - step: "Create child tax A (5%)"
+        action: "create"
+        model: "tax"
+        save_as: "child_a"
+        values:
+          name: "Child A 5% (Sync 4)"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create child tax B (6%)"
+        action: "create"
+        model: "tax"
+        save_as: "child_b"
+        values:
+          name: "Child B 6% (Sync 4)"
+          amount_type: "percent"
+          amount: 6.0
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create the group of taxes"
+        action: "create"
+        model: "tax"
+        save_as: "group_tax"
+        values:
+          name: "Group AB (Sync 4)"
+          amount_type: "group"
+          tax_group_id: "REC: vat_group.id"
+          children_tax_ids:
+            - - 6
+              - 0
+              - - "REC: child_a.id"
+                - "REC: child_b.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 4"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 4"
+          account_type: "expense"
+          code: "TS4001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 4"
+          account_type: "liability_current"
+          code: "TS4002"
+      - step: "Create an entry taxed with the group of taxes"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 200000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: group_tax.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -222000.0
+      - step: "Find the generated tax lines"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
+        save_as: "tax_lines"
+        expect_count: 2
+      - step: "Find child A's tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["tax_line_id", "=", "REC: child_a.id"]]
+        save_as: "tax_line_a"
+        limit: 1
+      - step: "Find child B's tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["tax_line_id", "=", "REC: child_b.id"]]
+        save_as: "tax_line_b"
+        limit: 1
+      - step: "Assert each child's amount and the group backlink"
+        action: "assert"
+        target: "tax_line_a"
+        asserts:
+          balance:
+            type: "value"
+            expected: 10000.0
+          group_tax_id:
+            type: "m2o"
+            expected: "REC: group_tax"
+      - step: "Assert child B's amount and the group backlink"
+        action: "assert"
+        target: "tax_line_b"
+        asserts:
+          balance:
+            type: "value"
+            expected: 12000.0
+          group_tax_id:
+            type: "m2o"
+            expected: "REC: group_tax"
+
+  - name: "Two independent taxes on one line each produce their own tax line"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 5"
+      - step: "Create tax C (5%)"
+        action: "create"
+        model: "tax"
+        save_as: "tax_c"
+        values:
+          name: "Tax C 5% (Sync 5)"
+          amount_type: "percent"
+          amount: 5.0
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create tax D (3%)"
+        action: "create"
+        model: "tax"
+        save_as: "tax_d"
+        values:
+          name: "Tax D 3% (Sync 5)"
+          amount_type: "percent"
+          amount: 3.0
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 5"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 5"
+          account_type: "expense"
+          code: "TS5001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 5"
+          account_type: "liability_current"
+          code: "TS5002"
+      - step: "Create an entry taxed with two independent taxes"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 100000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: tax_c.id"
+                      - "REC: tax_d.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -108000.0
+      - step: "Find the generated tax lines"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
+        save_as: "tax_lines"
+        expect_count: 2
+      - step: "Find tax C's line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["tax_line_id", "=", "REC: tax_c.id"]]
+        save_as: "tax_line_c"
+        limit: 1
+      - step: "Find tax D's line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [["move_id", "=", "REC: entry.id"], ["tax_line_id", "=", "REC: tax_d.id"]]
+        save_as: "tax_line_d"
+        limit: 1
+      - step: "Assert tax C's amount"
+        action: "assert"
+        target: "tax_line_c"
+        asserts:
+          balance:
+            type: "value"
+            expected: 5000.0
+      - step: "Assert tax D's amount"
+        action: "assert"
+        target: "tax_line_d"
+        asserts:
+          balance:
+            type: "value"
+            expected: 3000.0
+
+  - name: "include_base_amount raises the subsequent tax's base"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 6"
+      - step: "Create the base-raising fixed surcharge"
+        action: "create"
+        model: "tax"
+        save_as: "tax_surcharge"
+        values:
+          name: "Fixed Surcharge (Sync 6)"
+          amount_type: "fixed"
+          amount: 10.0
+          sequence: 1
+          include_base_amount: true
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create the 10% tax affected by the surcharge's base"
+        action: "create"
+        model: "tax"
+        save_as: "tax_percent"
+        values:
+          name: "VAT 10% (Sync 6)"
+          amount_type: "percent"
+          amount: 10.0
+          sequence: 2
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 6"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 6"
+          account_type: "expense"
+          code: "TS6001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 6"
+          account_type: "liability_current"
+          code: "TS6002"
+      - step: "Create an entry taxed with both cascading taxes"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 100.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: tax_surcharge.id"
+                      - "REC: tax_percent.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -121.0
+      - step: "Find the surcharge's tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["move_id", "=", "REC: entry.id"],
+            ["tax_line_id", "=", "REC: tax_surcharge.id"],
+          ]
+        save_as: "surcharge_line"
+        limit: 1
+      - step: "Find the percent tax's line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["move_id", "=", "REC: entry.id"],
+            ["tax_line_id", "=", "REC: tax_percent.id"],
+          ]
+        save_as: "percent_line"
+        limit: 1
+      - step: "Assert the surcharge stayed a flat 10"
+        action: "assert"
+        target: "surcharge_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: 10.0
+      - step: "Assert the percent tax was computed on the raised base (110), not 100"
+        action: "assert"
+        target: "percent_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: 11.0
+          tax_base_amount:
+            type: "value"
+            expected: 110.0
+
+  - name: "A price-included tax is still computed as total_excluded (product decision)"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 7"
+      - step: "Create a price-included 10% tax"
+        action: "create"
+        model: "tax"
+        save_as: "tax_included"
+        values:
+          name: "VAT 10% Included (Sync 7)"
+          amount_type: "percent"
+          amount: 10.0
+          price_include_override: "tax_included"
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 7"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 7"
+          account_type: "expense"
+          code: "TS7001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 7"
+          account_type: "liability_current"
+          code: "TS7002"
+      - step: "Create an entry taxed with the price-included tax"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 1000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: tax_included.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -1100.0
+      - step: "Find the tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
+        save_as: "tax_line"
+        limit: 1
+      - step:
+          "Assert the tax is 10% ON TOP of 1000 (100), not extracted FROM it (~90.91)"
+        action: "assert"
+        target: "tax_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: 100.0
+          tax_base_amount:
+            type: "value"
+            expected: 1000.0
+
+  - name: "A manually edited tax line amount survives an unrelated resync"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 8"
+      - step: "Create VAT 11%"
+        action: "create"
+        model: "tax"
+        save_as: "vat11"
+        values:
+          name: "VAT 11% (Sync 8)"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 8"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 8"
+          account_type: "expense"
+          code: "TS8001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 8"
+          account_type: "liability_current"
+          code: "TS8002"
+      - step: "Create an entry with a taxed debit line"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          ref: "Original Ref"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 1000000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: vat11.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -1110000.0
+      - step: "Find the generated tax line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["display_type", "=", "tax"]]
+        save_as: "tax_line"
+        limit: 1
+      - step: "Find the payable (credit) line"
+        action: "search"
+        model: "journal_entry.item"
+        domain:
+          [
+            ["move_id", "=", "REC: entry.id"],
+            ["account_id", "=", "REC: acc_payable.id"],
+          ]
+        save_as: "credit_line"
+        limit: 1
+      - step: "Manually override the tax line's amount, rebalancing the credit line"
+        action: "write"
+        target: "entry"
+        values:
+          line_ids:
+            - - 1
+              - "REC: tax_line.id"
+              - balance: 150000.0
+                amount_currency: 150000.0
+            - - 1
+              - "REC: credit_line.id"
+              - balance: -1150000.0
+      - step: "Write an unrelated header field, forcing another sync pass"
+        action: "write"
+        target: "entry"
+        values:
+          ref: "Updated Ref"
+      - step: "Assert the manual tax amount was not overwritten"
+        action: "assert"
+        target: "tax_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: 150000.0
+
+  - name: "An unbalanced tax-affected entry is rejected with an SSI-formatted error"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 9"
+      - step: "Create VAT 11%"
+        action: "create"
+        model: "tax"
+        save_as: "vat11"
+        values:
+          name: "VAT 11% (Sync 9)"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: vat_group.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 9"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 9"
+          account_type: "expense"
+          code: "TS9001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 9"
+          account_type: "liability_current"
+          code: "TS9002"
+      - step: "Creating a taxed entry without room for the tax amount is rejected"
+        action: "create"
+        model: "journal_entry"
+        expect_error:
+          type: "UserError"
+          message_contains: "Context: Save journal entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 1000000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: vat11.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -1000000.0
+
+  - name:
+      "A tax whose repartition line's account belongs to another company is rejected"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "vat_group"
+        values:
+          name: "VAT Group 10"
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_b"
+        values:
+          name: "Second Tax Sync Company"
+      - step: "Create an account belonging only to the second company"
+        action: "create"
+        model: "account.account"
+        save_as: "foreign_account"
+        context:
+          allowed_company_ids: ["REC: company_b.id"]
+        values:
+          name: "Foreign VAT Account"
+          code: "TS10FOREIGN"
+          account_type: "liability_current"
+          company_ids: [[6, 0, ["REC: company_b.id"]]]
+      - step: "Create VAT 11% whose tax repartition line posts to the foreign account"
+        action: "create"
+        model: "tax"
+        save_as: "vat11"
+        values:
+          name: "VAT 11% (Sync 10)"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: vat_group.id"
+          repartition_line_base_ids:
+            - - 0
+              - 0
+              - document_type: "base"
+                repartition_type: "base"
+            - - 0
+              - 0
+              - document_type: "base"
+                repartition_type: "tax"
+                account_id: "REC: foreign_account.id"
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Tax Sync Journal 10"
+          type: "general"
+      - step: "Create the expense account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_expense"
+        values:
+          name: "Expense Account 10"
+          account_type: "expense"
+          code: "TS10001"
+      - step: "Create the payable account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_payable"
+        values:
+          name: "Payable Account 10"
+          account_type: "liability_current"
+          code: "TS10002"
+      - step: "Creating an entry whose tax posts cross-company is rejected"
+        action: "create"
+        model: "journal_entry"
+        expect_error:
+          type: "UserError"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_expense.id"
+                balance: 1000000.0
+                tax_ids:
+                  - - 6
+                    - 0
+                    - - "REC: vat11.id"
+            - - 0
+              - 0
+              - account_id: "REC: acc_payable.id"
+                balance: -1110000.0
