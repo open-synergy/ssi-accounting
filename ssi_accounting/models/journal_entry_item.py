@@ -532,6 +532,33 @@ class JournalEntryItem(models.Model):
             line.price_subtotal = line.amount_currency
             line.price_total = line.amount_currency
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Force-refresh 'debit'/'credit'/'amount_currency' after insert.
+
+        Belt-and-suspenders fix for a ``create()``-only ordering pitfall
+        between ``@api.depends`` recompute and given-field ``inverse``
+        calls (see the class docstring): when only ``amount_currency``
+        is supplied for a new line, ``balance`` does end up correct (its
+        own inverse-driven update always wins), but ``debit``/``credit``
+        -- computed from ``balance`` -- were observed (CI, not just
+        theory) to sometimes still reflect ``balance``'s pre-inverse
+        value instead of the final one, because exactly *when* within
+        ``create()`` a dependent's compute runs relative to another
+        field's inverse is an ORM implementation detail this module
+        cannot rely on. Explicitly recomputing both here, strictly
+        *after* ``super().create()`` has fully returned (so ``balance``
+        is unquestionably settled by then, whichever of the three fill
+        directions produced it), removes that dependency entirely.
+        Idempotent when 'debit'/'credit'/'amount_currency' were already
+        consistent with 'balance' (the common case), so it is safe to
+        run unconditionally rather than only for lines missing them.
+        """
+        records = super().create(vals_list)
+        records._compute_debit_credit()
+        records._compute_amount_currency()
+        return records
+
     @api.constrains("debit", "credit")
     def _check_balanced_constrains(self):
         """Validate balance when a line's own debit/credit is written directly.
