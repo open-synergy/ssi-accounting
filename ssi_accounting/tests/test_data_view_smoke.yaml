@@ -1,0 +1,359 @@
+scenarios:
+  - name: "Load all views for the Chart of Accounts action"
+    steps:
+      - step: "Create an account"
+        action: "create"
+        model: "account.account"
+        save_as: "account"
+        values:
+          name: "View Smoke Account"
+          account_type: "asset_current"
+          code: "VS0001"
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "account"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
+
+  - name: "Load all views for the Account Groups action"
+    steps:
+      - step: "Create an account group"
+        action: "create"
+        model: "account.group"
+        save_as: "group"
+        values:
+          name: "View Smoke Group"
+          code_prefix_start: "91"
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_group_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_group_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_group_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "group"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
+
+  - name: "Load all views for the Account Tags action"
+    steps:
+      - step: "Create an account tag"
+        action: "create"
+        model: "account.tag"
+        save_as: "tag"
+        values:
+          name: "View Smoke Tag"
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_tag_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_tag_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.account_tag_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "tag"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
+
+  - name: "Load all views for the Journals action"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "View Smoke Journal"
+          type: "general"
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "journal"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
+
+  - name: "Load all views for the Journal Groups action"
+    steps:
+      - step: "Create a journal group"
+        action: "create"
+        model: "account.journal.group"
+        save_as: "journal_group"
+        values:
+          name: "View Smoke Journal Group"
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_group_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_group_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_group_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "journal_group"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
+
+  - name: "Load all views for the Tax Groups action"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "tax_group"
+        values:
+          name: "View Smoke Tax Group"
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.tax_group_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.tax_group_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.tax_group_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "tax_group"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
+
+  - name: "Load all views for the Taxes action"
+    steps:
+      - step: "Create a tax group"
+        action: "create"
+        model: "tax_group"
+        save_as: "tax_group"
+        values:
+          name: "View Smoke Tax Group For Tax"
+      - step: "Create a tax"
+        action: "create"
+        model: "tax"
+        save_as: "tax"
+        values:
+          name: "View Smoke Tax"
+          amount_type: "percent"
+          amount: 11.0
+          tax_group_id: "REC: tax_group.id"
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.tax_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.tax_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.tax_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "tax"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
+
+  - name: "Load all views for the Journal Entries action"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "View Smoke Entry Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "View Smoke Debit Account"
+          account_type: "asset_current"
+          code: "VS0002"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "View Smoke Credit Account"
+          account_type: "income"
+          code: "VS0003"
+      - step: "Create a draft journal entry with one balanced line pair"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-03-10
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 50.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 50.0
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_entry_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_entry_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_entry_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "entry"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
+
+  - name: "Load all views for the Journal Items action"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "View Smoke Item Journal"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "View Smoke Item Debit Account"
+          account_type: "asset_current"
+          code: "VS0004"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "View Smoke Item Credit Account"
+          account_type: "income"
+          code: "VS0005"
+      - step: "Create a draft journal entry with one balanced line pair"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-03-10
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 50.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 50.0
+      - step: "Find one of the journal items just created"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"]]
+        save_as: "item"
+        limit: 1
+      - step: "Get list view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_entry_item_view_list"
+        save_as: "v_list"
+      - step: "Get form view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_entry_item_view_form"
+        save_as: "v_form"
+      - step: "Get search view id"
+        action: "ref"
+        xml_id: "ssi_accounting.journal_entry_item_view_search"
+        save_as: "v_search"
+      - step: "Load list, form, and search views without error"
+        action: "call"
+        target: "item"
+        method: "get_views"
+        kwargs:
+          views:
+            - ["REC: v_list.id", "list"]
+            - ["REC: v_form.id", "form"]
+            - ["REC: v_search.id", "search"]
