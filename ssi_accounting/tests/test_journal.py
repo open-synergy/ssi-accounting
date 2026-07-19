@@ -44,16 +44,17 @@ class TestJournal(YamlTransactionCase):
         """Python murni -- pemicu P1 (L-01: `action: call` membuang nilai
         balik method, dan `copy()`/`copy_data()` tidak termasuk aksi yang
         mengisi registry di YAML; satu-satunya cara memeriksa vals yang
-        dihasilkan `copy_data()` -- terutama bahwa `code` dikosongkan agar
-        `_compute_code` membuatkan kode baru yang unik -- adalah menangkap
-        nilai baliknya langsung).
+        dihasilkan `copy_data()` -- terutama bahwa `code` dikeluarkan dari
+        vals (bukan sekadar diisi `False`) agar `_compute_code`
+        membuatkan kode baru yang unik -- adalah menangkap nilai baliknya
+        langsung).
         """
         journal = self.env["account.journal"].create(
             {"name": "Original", "code": "CPY01", "type": "general"}
         )
         vals_list = journal.copy_data()
         self.assertEqual(len(vals_list), 1)
-        self.assertFalse(vals_list[0]["code"])
+        self.assertNotIn("code", vals_list[0])
         self.assertEqual(vals_list[0]["name"], "Original (copy)")
 
         copy = journal.copy()

@@ -78,6 +78,7 @@ class AccountJournal(models.Model):
         readonly=False,
         store=True,
         precompute=True,
+        copy=False,
         help="Short, unique-per-company code used to prefix journal "
         "entry numbers. Auto-generated when left empty.",
     )
@@ -379,6 +380,14 @@ Solution: Remove or reassign the journal entries before deleting the
         default = dict(default or {})
         vals_list = super().copy_data(default=default)
         for journal, vals in zip(self, vals_list, strict=True):
-            vals["code"] = False
+            # `code` is `copy=False`, so `super().copy_data()` already
+            # excludes it -- pop it defensively anyway. Leaving the key
+            # OUT of vals (not merely falsy) is required for
+            # `_compute_code` (precompute) to run and assign a fresh,
+            # unique code: if 'code' were present in vals at all (even as
+            # False/None), the ORM would treat it as an explicit user
+            # value and write NULL straight to the NOT NULL column,
+            # bypassing the compute entirely.
+            vals.pop("code", None)
             vals["name"] = self.env._("%(name)s (copy)", name=journal.name)
         return vals_list
