@@ -18,3 +18,4 @@ from . import test_security_groups
 from . import test_tax
 from . import test_tax_computation
 from . import test_tax_group
+from . import test_tax_sync

@@ -330,9 +330,15 @@ class JournalEntryItem(models.Model):
     tax_line_id = fields.Many2one(
         comodel_name="tax",
         string="Originator Tax",
+        related="tax_repartition_line_id.tax_id",
+        store=True,
         index="btree_not_null",
         help="Technical field: which tax this line represents, when "
-        "'display_type' is 'tax'.",
+        "'display_type' is 'tax'. Derived from 'tax_repartition_line_id' "
+        "-- ported (behaviour-wise) from upstream "
+        "'account.move.line.tax_line_id', which is the same related "
+        "field; not set directly by '_sync_tax_lines'/'_prepare_tax_lines' "
+        "grouping keys, exactly like upstream.",
     )
     tax_group_id = fields.Many2one(
         comodel_name="tax_group",
@@ -553,11 +559,100 @@ class JournalEntryItem(models.Model):
         Idempotent when 'debit'/'credit'/'amount_currency' were already
         consistent with 'balance' (the common case), so it is safe to
         run unconditionally rather than only for lines missing them.
+
+        **Run under both sync-suppression flags**: this refresh assigns
+        ``line.debit``/``line.credit``/``line.amount_currency``
+        field-by-field, and Odoo's own field setter turns each assignment
+        into a ``write()`` -- which, since ``debit``'s/``credit``'s
+        ``inverse`` methods themselves assign back into ``balance``
+        (see the class docstring), cascades into further nested
+        ``write()`` calls. Every one of them would otherwise reach this
+        model's ``write()`` override (re-running the full tax/balancing
+        sync, redundantly, once per cascaded assignment) and its
+        ``_check_balanced_constrains``/explicit final check (rejecting a
+        taxed line whose own tax line has not been synced yet -- that
+        only happens afterwards, in ``journal_entry._sync_tax_lines``).
+        ``skip_journal_entry_sync_dynamic_lines`` suppresses the former
+        (the same flag ``journal_entry.write()``'s own recursion guard
+        uses), ``skip_check_balanced_constrains`` the latter -- see
+        ``journal_entry._check_balanced_constrains``'s docstring for the
+        full reasoning on that second one. ``records`` itself (returned
+        below) is never rebound to the flagged context, so nothing leaks
+        to the caller.
         """
         records = super().create(vals_list)
-        records._compute_debit_credit()
-        records._compute_amount_currency()
+        refresh = records.with_context(
+            skip_check_balanced_constrains=True,
+            skip_journal_entry_sync_dynamic_lines=True,
+        )
+        refresh._compute_debit_credit()
+        refresh._compute_amount_currency()
         return records
+
+    def write(self, vals):
+        """Trigger the parent entry's tax/balancing sync around a direct write.
+
+        Necessary counterpart to ``journal_entry.write()``: the ORM
+        applies a one2many command like ``(1, id, vals)`` by calling this
+        model's own ``write()`` directly on the child, never re-entering
+        ``journal_entry.write()`` -- so without this override, editing a
+        line directly (the only way this repo's own "Journal Entry" form
+        edits an existing row today, and the natural way to write a test
+        against a single line) would bypass ``_sync_dynamic_lines``
+        entirely and no tax line would ever be (re)computed. Ported
+        (behaviour-wise, trimmed to this repo's scope -- no lock date/
+        hash/reconciliation/tracking machinery, none of which exists here
+        yet) from upstream ``AccountMoveLine.write``, which wraps its own
+        ``super().write()`` the same way for the same reason.
+
+        **Guarded with the same ``journal_entry._disable_recursion`` flag
+        ``journal_entry.write()`` itself uses**, and for the same reason:
+        without it, a header-side ``line_ids: [(1, id, vals), ...]`` write
+        would re-enter the full sync stack once per line (each nested
+        child ``write()`` re-running ``_sync_dynamic_lines`` on top of the
+        header's own already-in-progress pass), and
+        ``_sync_tax_lines``'s own bulk ``journal_entry.item.write()`` calls
+        (creating/updating/deleting tax lines) would recursively
+        re-trigger themselves. Both cases share this method's env/context
+        with whichever ``journal_entry.write()``/``_sync_tax_lines`` call
+        is already running, so the shared flag correctly recognises them
+        and skips the redundant nested pass; a write reaching this method
+        on its own (the common case -- editing a line directly, e.g. from
+        a list view or a test) carries no such flag and syncs normally.
+
+        **Also suppresses ``skip_check_balanced_constrains`` for the
+        duration of the whole ``_sync_dynamic_lines`` cycle** (not just
+        ``super().write()`` itself -- its post-yield tax/balancing stages
+        can just as well force an unrelated compute to flush and
+        re-validate every line's balance mid-cycle, see
+        ``journal_entry.create()``'s docstring), then validates balance
+        explicitly, exactly once, right after the sync closes -- same
+        reasoning as ``journal_entry.write()``'s own docstring: a
+        coordinated multi-line write (e.g. a taxed base line and its tax
+        line updated together) is genuinely, transiently unbalanced
+        between the individual child writes the ORM issues one at a
+        time, and the eager constrain would otherwise reject it over
+        that transient state.
+        """
+        if not vals:
+            return True
+        moves = self.move_id
+        move_container = {"records": moves}
+        if moves and moves._disable_recursion(
+            move_container, "journal_entry_sync_dynamic_lines"
+        ):
+            return super().write(vals)
+        flagged_moves = move_container["records"].with_context(
+            skip_check_balanced_constrains=True
+        )
+        move_container["records"] = flagged_moves
+        with flagged_moves._sync_dynamic_lines(move_container):
+            result = super(
+                JournalEntryItem,
+                self.with_context(skip_check_balanced_constrains=True),
+            ).write(vals)
+        moves._check_balanced({"records": moves})
+        return result
 
     def _affect_tax_report(self):
         """Whether this line carries a tax that affects the tax report.
@@ -588,6 +683,12 @@ class JournalEntryItem(models.Model):
         that case -- same split as
         ``tax.repartition_line._check_repartition_line_factor``'s
         docstring already explains for a different model.
+
+        **Skipped while ``create()``/``write()`` are still mid-sync**
+        (flagged via ``skip_check_balanced_constrains``) -- see
+        ``journal_entry._check_balanced_constrains``'s docstring for why.
         """
+        if self.env.context.get("skip_check_balanced_constrains"):
+            return
         for move in self.move_id:
             move._check_balanced({"records": move})
