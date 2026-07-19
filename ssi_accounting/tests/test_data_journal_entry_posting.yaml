@@ -386,6 +386,7 @@ scenarios:
       - step: "Assert the number and posted_before are kept"
         action: "assert"
         target: "entry"
+        refresh: true
         asserts:
           name:
             type: "value"
