@@ -795,6 +795,15 @@ scenarios:
         save_as: "company_b"
         values:
           name: "Second Reconcile Company"
+      - step: "Get the admin user"
+        action: "ref"
+        xml_id: "base.user_admin"
+        save_as: "admin_user"
+      - step: "Grant the admin user access to the second company"
+        action: "write"
+        target: "admin_user"
+        values:
+          company_ids: [[4, "REC: company_b.id"]]
       - step: "Create a journal in the second company"
         action: "create"
         model: "account.journal"
