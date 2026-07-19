@@ -330,9 +330,15 @@ class JournalEntryItem(models.Model):
     tax_line_id = fields.Many2one(
         comodel_name="tax",
         string="Originator Tax",
+        related="tax_repartition_line_id.tax_id",
+        store=True,
         index="btree_not_null",
         help="Technical field: which tax this line represents, when "
-        "'display_type' is 'tax'.",
+        "'display_type' is 'tax'. Derived from 'tax_repartition_line_id' "
+        "-- ported (behaviour-wise) from upstream "
+        "'account.move.line.tax_line_id', which is the same related "
+        "field; not set directly by '_sync_tax_lines'/'_prepare_tax_lines' "
+        "grouping keys, exactly like upstream.",
     )
     tax_group_id = fields.Many2one(
         comodel_name="tax_group",
@@ -615,7 +621,11 @@ class JournalEntryItem(models.Model):
         a list view or a test) carries no such flag and syncs normally.
 
         **Also suppresses ``skip_check_balanced_constrains`` for the
-        duration of ``super().write()``**, then validates balance
+        duration of the whole ``_sync_dynamic_lines`` cycle** (not just
+        ``super().write()`` itself -- its post-yield tax/balancing stages
+        can just as well force an unrelated compute to flush and
+        re-validate every line's balance mid-cycle, see
+        ``journal_entry.create()``'s docstring), then validates balance
         explicitly, exactly once, right after the sync closes -- same
         reasoning as ``journal_entry.write()``'s own docstring: a
         coordinated multi-line write (e.g. a taxed base line and its tax
@@ -632,7 +642,11 @@ class JournalEntryItem(models.Model):
             move_container, "journal_entry_sync_dynamic_lines"
         ):
             return super().write(vals)
-        with move_container["records"]._sync_dynamic_lines(move_container):
+        flagged_moves = move_container["records"].with_context(
+            skip_check_balanced_constrains=True
+        )
+        move_container["records"] = flagged_moves
+        with flagged_moves._sync_dynamic_lines(move_container):
             result = super(
                 JournalEntryItem,
                 self.with_context(skip_check_balanced_constrains=True),

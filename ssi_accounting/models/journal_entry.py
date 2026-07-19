@@ -1389,18 +1389,21 @@ Solution: Adjust the lines' debit/credit so each entry balances to zero,
 
         See ``_check_balanced_constrains``'s docstring for why the eager
         constrain is suppressed (``skip_check_balanced_constrains``) for
-        the duration of ``super().create()`` -- it would otherwise fire
-        mid-sync, while a taxed line's own tax line has not been created
-        yet, and reject a perfectly valid entry over its own transient
-        construction state. ``moves`` is rebound to ``self`` (this
-        method's own, unflagged recordset) before being returned, so the
-        suppression never leaks to the caller.
+        the duration of the whole ``_sync_dynamic_lines`` cycle -- not
+        just ``super().create()`` itself, but also its post-yield tax/
+        balancing stages (e.g. deleting a now-untaxed line's tax line
+        forces an unrelated compute -- ``amount_total_debit`` -- to flush
+        and re-validate every line's balance mid-cycle). Without covering
+        the whole cycle, that post-yield work would reject a perfectly
+        valid entry over its own transient construction state. ``moves``
+        is rebound to ``self`` (this method's own, unflagged recordset)
+        before being returned, so the suppression never leaks to the
+        caller.
         """
         container = {"records": self.env["journal_entry"]}
-        with self._sync_dynamic_lines(container):
-            created = super(
-                JournalEntry, self.with_context(skip_check_balanced_constrains=True)
-            ).create(vals_list)
+        flagged_self = self.with_context(skip_check_balanced_constrains=True)
+        with flagged_self._sync_dynamic_lines(container):
+            created = super(JournalEntry, flagged_self).create(vals_list)
             moves = self.browse(created.ids)
             container["records"] = moves
         self._check_balanced({"records": moves})
@@ -1409,18 +1412,17 @@ Solution: Adjust the lines' debit/credit so each entry balances to zero,
     def write(self, vals):
         """Write, then validate balance once the tax/balancing sync has settled.
 
-        See ``_check_balanced_constrains``'s docstring for why the eager
-        constrain is suppressed (``skip_check_balanced_constrains``) for
-        the duration of ``super().write()``.
+        See ``create()``'s and ``_check_balanced_constrains``'s
+        docstrings for why the eager constrain is suppressed
+        (``skip_check_balanced_constrains``) for the duration of the
+        whole ``_sync_dynamic_lines`` cycle, not just ``super().write()``.
         """
         container = {"records": self}
         if self._disable_recursion(container, "journal_entry_sync_dynamic_lines"):
             return super().write(vals)
-        flagged = container["records"]
+        flagged = container["records"].with_context(skip_check_balanced_constrains=True)
+        container["records"] = flagged
         with flagged._sync_dynamic_lines(container):
-            result = super(
-                JournalEntry,
-                flagged.with_context(skip_check_balanced_constrains=True),
-            ).write(vals)
+            result = super(JournalEntry, flagged).write(vals)
         self._check_balanced({"records": self})
         return result
