@@ -574,12 +574,31 @@ class JournalEntryItem(models.Model):
         hash/reconciliation/tracking machinery, none of which exists here
         yet) from upstream ``AccountMoveLine.write``, which wraps its own
         ``super().write()`` the same way for the same reason.
+
+        **Guarded with the same ``journal_entry._disable_recursion`` flag
+        ``journal_entry.write()`` itself uses**, and for the same reason:
+        without it, a header-side ``line_ids: [(1, id, vals), ...]`` write
+        would re-enter the full sync stack once per line (each nested
+        child ``write()`` re-running ``_sync_dynamic_lines`` on top of the
+        header's own already-in-progress pass), and
+        ``_sync_tax_lines``'s own bulk ``journal_entry.item.write()`` calls
+        (creating/updating/deleting tax lines) would recursively
+        re-trigger themselves. Both cases share this method's env/context
+        with whichever ``journal_entry.write()``/``_sync_tax_lines`` call
+        is already running, so the shared flag correctly recognises them
+        and skips the redundant nested pass; a write reaching this method
+        on its own (the common case -- editing a line directly, e.g. from
+        a list view or a test) carries no such flag and syncs normally.
         """
         if not vals:
             return True
         moves = self.move_id
         move_container = {"records": moves}
-        with moves._sync_dynamic_lines(move_container):
+        if moves and moves._disable_recursion(
+            move_container, "journal_entry_sync_dynamic_lines"
+        ):
+            return super().write(vals)
+        with move_container["records"]._sync_dynamic_lines(move_container):
             result = super().write(vals)
         return result
 
