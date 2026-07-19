@@ -215,6 +215,20 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid ""
+"\n"
+"Context: Save journal entry\n"
+"Database ID: %(database_id)s\n"
+"Problem: The following journal entries are not balanced (sum of debit\n"
+"    minus credit is not zero):\n"
+"%(lines)s\n"
+"Solution: Adjust the lines' debit/credit so each entry balances to zero,\n"
+"    or set a suspense account on the journal to auto-balance drafts\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/models/tax_repartition_line.py:0
 msgid ""
 "\n"
@@ -321,6 +335,12 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "- %(move)s: unbalanced by %(delta)s"
+msgstr ""
+
+#. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_view_form
 msgid "<span class=\"o_stat_text\">Entries</span>"
 msgstr ""
@@ -333,10 +353,17 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_account_account
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_code_mapping__account_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__account_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__account_id
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_form
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
 msgid "Account"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__account_code
+msgid "Account Code"
 msgstr ""
 
 #. module: ssi_accounting
@@ -364,8 +391,19 @@ msgid "Account Groups"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__account_internal_group
+msgid "Account Internal Group"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__name
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__account_name
 msgid "Account Name"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__account_root_id
+msgid "Account Root"
 msgstr ""
 
 #. module: ssi_accounting
@@ -380,6 +418,7 @@ msgid "Account Tags"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__account_type
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Account Type"
 msgstr ""
@@ -418,6 +457,14 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_code_mapping__account_id
 msgid "Account this code mapping row belongs to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__account_id
+msgid ""
+"Account this line posts to. Required for 'product'/'tax' rows and forbidden "
+"for 'line_section'/'line_note' rows -- enforced by SQL CHECK, not by "
+"'required=True' here, see the class docstring."
 msgstr ""
 
 #. module: ssi_accounting
@@ -463,6 +510,11 @@ msgid "Accounting"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__date
+msgid "Accounting date of this journal entry."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_tag__applicability__accounts
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_tag_view_search
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
@@ -472,6 +524,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_needaction
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_needaction
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_needaction
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_needaction
 msgid "Action Needed"
 msgstr ""
@@ -487,6 +540,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_ids
 msgid "Activities"
 msgstr ""
@@ -494,6 +548,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_exception_decoration
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_exception_decoration
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_exception_decoration
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_exception_decoration
 msgid "Activity Exception Decoration"
 msgstr ""
@@ -501,6 +556,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_state
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_state
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_state
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_state
 msgid "Activity State"
 msgstr ""
@@ -508,6 +564,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_type_icon
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_type_icon
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_type_icon
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_type_icon
 msgid "Activity Type Icon"
 msgstr ""
@@ -535,6 +592,42 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__amount
 msgid "Amount"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__amount_currency
+msgid "Amount Currency"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__amount_total_credit
+msgid "Amount Total Credit"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__amount_total_debit
+msgid "Amount Total Debit"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__credit
+msgid ""
+"Amount posted to the credit side of 'account_id', in the company currency. "
+"Derived from 'balance'; editing this directly updates 'balance' (and "
+"therefore 'debit') back. See 'debit' for why this is deliberately not "
+"'precompute=True'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__debit
+msgid ""
+"Amount posted to the debit side of 'account_id', in the company currency. "
+"Derived from 'balance'; editing this directly updates 'balance' (and "
+"therefore 'credit') back. Deliberately **not** 'precompute=True' -- see the "
+"class docstring: unlike 'balance' itself, a precomputed 'debit'/'credit' "
+"would be baked in during create()'s pre-insert pass, before a same-call "
+"'amount_currency'-only fill direction gets a chance to resolve 'balance' via"
+" its own inverse, leaving 'debit'/'credit' stale."
 msgstr ""
 
 #. module: ssi_accounting
@@ -597,6 +690,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_attachment_count
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_attachment_count
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_attachment_count
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_attachment_count
 msgid "Attachment Count"
 msgstr ""
@@ -607,8 +701,19 @@ msgid "August"
 msgstr ""
 
 #. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "Automatic Balancing Line"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_mixin_sequence_number
 msgid "Automatic Sequence Number"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__balance
+msgid "Balance"
 msgstr ""
 
 #. module: ssi_accounting
@@ -652,6 +757,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__internal_group
 msgid "Broad accounting group derived from account_type."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry__state__cancel
+msgid "Cancelled"
 msgstr ""
 
 #. module: ssi_accounting
@@ -729,6 +839,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__company_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__company_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__company_id
@@ -742,6 +854,8 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__company_currency_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__company_currency_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__company_currency_id
 msgid "Company Currency"
 msgstr ""
 
@@ -765,6 +879,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__company_id
 msgid "Company this journal belongs to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__company_id
+msgid "Company this journal entry belongs to, inherited from its journal."
 msgstr ""
 
 #. module: ssi_accounting
@@ -825,6 +944,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__create_uid
@@ -838,6 +959,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__create_date
@@ -846,14 +969,40 @@ msgid "Created on"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__credit
+msgid "Credit"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__liability_credit_card
 msgid "Credit Card"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__cumulated_balance
+msgid "Cumulated Balance"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_res_currency
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__currency_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__currency_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__currency_id
 msgid "Currency"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__currency_id
+msgid ""
+"Currency 'amount_currency' is expressed in. Defaults to the parent journal "
+"entry's currency."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__company_currency_id
+msgid ""
+"Currency 'debit'/'credit'/'balance'/'cumulated_balance' are expressed in -- "
+"the company currency of the parent journal entry."
 msgstr ""
 
 #. module: ssi_accounting
@@ -862,10 +1011,25 @@ msgid "Currency Exchange"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__currency_rate
+msgid "Currency Rate"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__company_currency_id
 msgid ""
 "Currency of the active company, used to display monetary fields on this "
 "account."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__company_currency_id
+msgid "Currency of the company this journal entry belongs to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__currency_id
+msgid "Currency used to encode amounts on this journal entry's lines."
 msgstr ""
 
 #. module: ssi_accounting
@@ -889,8 +1053,17 @@ msgid "Current Year Earnings"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__date
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__date
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__date
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
 msgid "Date"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__date_maturity
+msgid "Date Maturity"
 msgstr ""
 
 #. module: ssi_accounting
@@ -898,6 +1071,11 @@ msgstr ""
 msgid ""
 "Day of the month the fiscal year ends on, combined with Fiscal Year Last "
 "Month."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__debit
+msgid "Debit"
 msgstr ""
 
 #. module: ssi_accounting
@@ -916,6 +1094,7 @@ msgid "Default Account Type"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__company_price_include
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__account_price_include
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__company_price_include
 msgid "Default Sales Price Include"
@@ -944,6 +1123,11 @@ msgid "Description"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__discount
+msgid "Discount (%)"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__display_mapping_tab
 msgid "Display Mapping Tab"
 msgstr ""
@@ -956,6 +1140,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_root__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_currency__display_name
@@ -967,8 +1153,22 @@ msgid "Display Name"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__display_type
+msgid "Display Type"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__placeholder_code
 msgid "Display code"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__display_type
+msgid ""
+"Distinguishes a normal debit/credit line ('Item') from a tax line ('Tax') or"
+" a purely cosmetic section/note line. Read by the tax engine to tell base "
+"lines from tax lines, and by this model's SQL CHECK constraints to tell "
+"which rows must carry an account and non-zero amounts and which must not."
 msgstr ""
 
 #. module: ssi_accounting
@@ -989,6 +1189,12 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__document_type
 msgid "Document Type"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry__state__draft
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
+msgid "Draft"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1029,6 +1235,11 @@ msgstr ""
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__expense
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Expenses"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__extra_tax_data
+msgid "Extra Tax Data"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1094,6 +1305,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_follower_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_follower_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_follower_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_follower_ids
 msgid "Followers"
 msgstr ""
@@ -1101,6 +1313,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_partner_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_partner_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_partner_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_partner_ids
 msgid "Followers (Partners)"
 msgstr ""
@@ -1108,8 +1321,14 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_type_icon
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_type_icon
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__activity_type_icon
 #: model:ir.model.fields,help:ssi_accounting.field_tax__activity_type_icon
 msgid "Font awesome icon e.g. fa-tasks"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.constraint,message:ssi_accounting.constraint_journal_entry_item_check_non_accountable_fields_null
+msgid "Forbidden balance or account on non-accountable line."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1127,13 +1346,28 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__name
+msgid "Free-form description of this line."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax__description
 msgid "Free-form description of this tax, e.g. printed on documents."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__ref
+msgid "Free-form external reference for this journal entry."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__note
 msgid "Free-form internal note about this account."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__narration
+msgid "Free-form note attached to this journal entry."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1169,6 +1403,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__has_message
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__has_message
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__has_message
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__has_message
 msgid "Has Message"
 msgstr ""
@@ -1200,6 +1435,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_root__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_currency__id
@@ -1213,6 +1450,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_exception_icon
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_exception_icon
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_exception_icon
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_exception_icon
 msgid "Icon"
 msgstr ""
@@ -1220,6 +1458,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_exception_icon
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_exception_icon
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__activity_exception_icon
 #: model:ir.model.fields,help:ssi_accounting.field_tax__activity_exception_icon
 msgid "Icon to indicate an exception activity."
 msgstr ""
@@ -1227,6 +1466,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_needaction
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_needaction
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__message_needaction
 #: model:ir.model.fields,help:ssi_accounting.field_tax__message_needaction
 msgid "If checked, new messages require your attention."
 msgstr ""
@@ -1234,6 +1474,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_has_error
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_has_error
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__message_has_error
 #: model:ir.model.fields,help:ssi_accounting.field_tax__message_has_error
 msgid "If checked, some messages have a delivery error."
 msgstr ""
@@ -1288,6 +1529,14 @@ msgid "Income"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__discount
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__price_unit
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__quantity
+msgid ""
+"Informational only -- ignored by the tax engine, see the class docstring."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__internal_group
 msgid "Internal Group"
 msgstr ""
@@ -1308,8 +1557,19 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_is_follower
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_is_follower
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_is_follower
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_is_follower
 msgid "Is Follower"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__is_same_currency
+msgid "Is Same Currency"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry_item__display_type__product
+msgid "Item"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1319,17 +1579,33 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_account_journal
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__journal_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__journal_id
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
 msgid "Journal"
 msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
 #: code:addons/ssi_accounting/models/journal.py:0
+#: model:ir.actions.act_window,name:ssi_accounting.journal_entry_action
+#: model:ir.ui.menu,name:ssi_accounting.journal_entry_menu
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_list
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
 msgid "Journal Entries"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_journal_entry
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Journal Entry"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_account_journal_group
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__journal_group_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__journal_group_id
 msgid "Journal Group"
 msgstr ""
 
@@ -1341,8 +1617,33 @@ msgid "Journal Groups"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_journal_entry_item
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_form
+msgid "Journal Item"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.actions.act_window,name:ssi_accounting.journal_entry_item_action
+#: model:ir.ui.menu,name:ssi_accounting.journal_entry_item_menu
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_list
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_search
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Journal Items"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__account_journal_suspense_account_id
 msgid "Journal Suspense Account"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__move_id
+msgid "Journal entry this line belongs to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__journal_id
+msgid "Journal this entry is posted to."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1381,6 +1682,7 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__name
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__label
 msgid "Label"
 msgstr ""
@@ -1432,6 +1734,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__write_uid
@@ -1445,6 +1749,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__write_date
@@ -1456,6 +1762,16 @@ msgstr ""
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__internal_group__liability
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Liability"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__line_ids
+msgid "Line"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__line_ids
+msgid "Lines (journal items) of this journal entry."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1503,6 +1819,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_has_error
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_has_error
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_has_error
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_has_error
 msgid "Message Delivery error"
 msgstr ""
@@ -1510,8 +1827,23 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_ids
 msgid "Messages"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__price_subtotal
+msgid ""
+"Mirrors 'amount_currency' on 'product' lines -- see the class docstring for "
+"why this is not 'quantity * price_unit'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__price_total
+msgid ""
+"Mirrors 'amount_currency' on 'product' lines -- see the class docstring. No "
+"tax amount is added: tax synchronisation is a separate, later unit."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1527,13 +1859,24 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.constraint,message:ssi_accounting.constraint_journal_entry_item_check_accountable_required_fields
+msgid "Missing required account on accountable line."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_res_company__fiscalyear_last_month
 msgid "Month the fiscal year ends on, combined with Fiscal Year Last Day."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__move_id
+msgid "Move"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__my_activity_date_deadline
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__my_activity_date_deadline
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__my_activity_date_deadline
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__my_activity_date_deadline
 msgid "My Activity Deadline"
 msgstr ""
@@ -1543,6 +1886,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_root__name
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__name
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__move_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__name
 msgid "Name"
 msgstr ""
@@ -1550,6 +1895,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_date_deadline
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_date_deadline
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_date_deadline
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_date_deadline
 msgid "Next Activity Deadline"
 msgstr ""
@@ -1557,6 +1903,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_summary
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_summary
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_summary
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_summary
 msgid "Next Activity Summary"
 msgstr ""
@@ -1564,6 +1911,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_type_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_type_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_type_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_type_id
 msgid "Next Activity Type"
 msgstr ""
@@ -1584,6 +1932,11 @@ msgid "None"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry_item__display_type__line_note
+msgid "Note"
+msgstr ""
+
+#. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_form
 msgid "Notes"
 msgstr ""
@@ -1596,6 +1949,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_needaction_counter
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_needaction_counter
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_needaction_counter
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_needaction_counter
 msgid "Number of Actions"
 msgstr ""
@@ -1603,20 +1957,20 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_has_error_counter
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_has_error_counter
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__message_has_error_counter
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_has_error_counter
 msgid "Number of errors"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__entry_count
-msgid ""
-"Number of journal entries posted on this journal. Always 0 until "
-"'account.move' is added in a later unit."
+msgid "Number of journal entries linked to this journal."
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_needaction_counter
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_needaction_counter
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__message_needaction_counter
 #: model:ir.model.fields,help:ssi_accounting.field_tax__message_needaction_counter
 msgid "Number of messages requiring action"
 msgstr ""
@@ -1624,6 +1978,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_has_error_counter
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_has_error_counter
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__message_has_error_counter
 #: model:ir.model.fields,help:ssi_accounting.field_tax__message_has_error_counter
 msgid "Number of messages with delivery error"
 msgstr ""
@@ -1654,8 +2009,30 @@ msgid "Opening/Closing"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__date_maturity
+msgid "Optional due date for this line."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__tag_ids
 msgid "Optional grid tags used for tax reporting."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__partner_id
+msgid "Optional partner this journal entry is related to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__partner_id
+msgid "Optional partner this line is related to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__product_id
+msgid ""
+"Optional product this line is related to. Informational only -- ignored by "
+"the tax engine, see the class docstring."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1672,6 +2049,21 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__group_tax_id
+msgid "Originator Group of Taxes"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__tax_line_id
+msgid "Originator Tax"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__tax_repartition_line_id
+msgid "Originator Tax Repartition Line"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__expense_other
 msgid "Other Expenses"
 msgstr ""
@@ -1679,6 +2071,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__income_other
 msgid "Other Income"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Other Info"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1698,6 +2095,12 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__parent_path
 msgid "Parent Path"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__partner_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__partner_id
+msgid "Partner"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1722,6 +2125,17 @@ msgid "Percentage Tax Included"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry__state__posted
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
+msgid "Posted"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__posted_before
+msgid "Posted Before"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__current_balance
 msgid "Posted balance of this account in the active company."
 msgstr ""
@@ -1742,15 +2156,48 @@ msgid "Price Include"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__price_subtotal
+msgid "Price Subtotal"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__price_total
+msgid "Price Total"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__product_id
+msgid "Product"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__type_tax_use__purchase
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
 msgid "Purchases"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__quantity
+msgid "Quantity"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__asset_receivable
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Receivable"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__ref
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__ref
+msgid "Reference"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__name
+msgid ""
+"Reference/number of this journal entry. Stays '/' until a later unit adds "
+"automatic numbering -- fill it in manually until then."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1761,6 +2208,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_user_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_user_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__activity_user_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_user_id
 msgid "Responsible User"
 msgstr ""
@@ -1809,9 +2257,21 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__cumulated_balance
+msgid ""
+"Running total of 'balance' over the lines currently listed, in the order "
+"they are listed (e.g. by date)."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__type_tax_use__sale
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
 msgid "Sales"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry_item__display_type__line_section
+msgid "Section"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1822,6 +2282,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__sequence
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__sequence
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__sequence
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__sequence
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__sequence
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__sequence
@@ -1885,10 +2346,39 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__amount_currency
+msgid ""
+"Signed amount expressed in 'currency_id'. Equal to 'balance' when the line's"
+" currency is the company currency; editing this directly on a foreign-"
+"currency line recomputes 'balance' (and therefore 'debit'/'credit') using "
+"'currency_rate'. See 'debit' for why this is deliberately not "
+"'precompute=True'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__balance
+msgid ""
+"Signed amount in the company currency: 'debit' minus 'credit'. This is the "
+"primary field the other three fill directions ('debit'/'credit', "
+"'amount_currency') all resolve back into -- see this class's docstring for "
+"why a two-hop inverse chain does not reliably cascade during create(). Safe "
+"to keep 'precompute=True' here (unlike 'debit'/'credit'/'amount_currency'): "
+"its compute is a self-referential no-op when a value already exists, so an "
+"early pre-insert pass never clobbers a value one of the other three inverses"
+" sets later in the same create() call."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_group__code_prefix_start
 msgid ""
 "Starting account code prefix covered by this group. Defaults to the ending "
 "prefix when left empty."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__state
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__parent_state
+msgid "State"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1900,8 +2390,14 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
+msgid "Status"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_state
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_state
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__activity_state
 #: model:ir.model.fields,help:ssi_accounting.field_tax__activity_state
 msgid ""
 "Status based on activities\n"
@@ -1911,10 +2407,32 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__state
+msgid ""
+"Status of this journal entry. Posting/cancelling is added by a later unit --"
+" every entry stays 'draft' for now."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax__children_tax_ids
 msgid ""
 "Sub taxes aggregated by this tax. Only used when 'amount_type' is 'Group of "
 "Taxes'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__suitable_journal_ids
+msgid "Suitable Journal"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__amount_total_credit
+msgid "Sum of the credit of every line, in the company currency."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__amount_total_debit
+msgid "Sum of the debit of every line, in the company currency."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1940,11 +2458,18 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_tax
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__tax_id
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry_item__display_type__tax
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__tax_repartition_line__repartition_type__tax
 msgid "Tax"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__tax_base_amount
+msgid "Tax Base Amount"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__tax_calculation_rounding_method
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__tax_calculation_rounding_method
 msgid "Tax Calculation Rounding Method"
 msgstr ""
@@ -1961,12 +2486,14 @@ msgid "Tax Excluded"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__tax_tag_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__tag_ids
 msgid "Tax Grids"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_tax_group
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__tax_group_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax__tax_group_id
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
 msgid "Tax Group"
@@ -2055,6 +2582,7 @@ msgstr ""
 #. odoo-python
 #: code:addons/ssi_accounting/models/account.py:0
 #: model:ir.actions.act_window,name:ssi_accounting.tax_action
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__tax_ids
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_tag__applicability__taxes
 #: model:ir.ui.menu,name:ssi_accounting.tax_menu
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_tag_view_search
@@ -2063,11 +2591,21 @@ msgid "Taxes"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__tax_ids
+msgid "Taxes applying to this line when 'display_type' is 'product'."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__sequence_override_regex
 msgid ""
 "Technical field read by 'mixin.sequence_number' (once a concrete numbered "
 "document is wired to a journal) to enforce a custom sequence composition the"
 " mixin would otherwise misinterpret."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__tax_base_amount
+msgid "Technical field: base amount this tax line was computed from."
 msgstr ""
 
 #. module: ssi_accounting
@@ -2085,14 +2623,129 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__journal_group_id
+msgid ""
+"Technical field: first journal group the journal belongs to, used to filter "
+"journal entry lists by group."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__suitable_journal_ids
+msgid ""
+"Technical field: journals selectable on 'journal_id', restricted to this "
+"entry's company."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__account_type
+msgid "Technical field: mirrors 'account_id.account_type'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__account_code
+msgid "Technical field: mirrors 'account_id.code' for list display."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__account_internal_group
+msgid "Technical field: mirrors 'account_id.internal_group'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__account_name
+msgid "Technical field: mirrors 'account_id.name' for list display."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__account_root_id
+msgid "Technical field: mirrors 'account_id.root_id'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__tax_group_id
+msgid "Technical field: mirrors 'tax_line_id.tax_group_id'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__move_name
+msgid ""
+"Technical field: mirrors the parent journal entry's 'name', used to "
+"order/search journal items without joining."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__parent_state
+msgid ""
+"Technical field: mirrors the parent journal entry's 'state', used by the "
+"view to make lines readonly once posted."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__company_id
+msgid "Technical field: mirrors the parent journal entry's company."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__date
+msgid "Technical field: mirrors the parent journal entry's date."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__journal_group_id
+msgid "Technical field: mirrors the parent journal entry's journal group."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__journal_id
+msgid "Technical field: mirrors the parent journal entry's journal."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__ref
+msgid "Technical field: mirrors the parent journal entry's reference."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__extra_tax_data
+msgid ""
+"Technical field: opaque tax computation detail attached to this line by the "
+"(not yet wired) tax synchronisation engine."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__currency_rate
+msgid ""
+"Technical field: rate used to convert 'balance' (company currency) into "
+"'amount_currency' (line currency)."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__tax_tag_ids
+msgid ""
+"Technical field: tax grid tags carried over from the originating tax "
+"repartition line."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__company_price_include
 #: model:ir.model.fields,help:ssi_accounting.field_tax__company_price_include
 msgid ""
 "Technical field: the company's default on whether prices include taxes."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__tax_calculation_rounding_method
+msgid "Technical field: the company's tax rounding method."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax_group__country_code
 msgid "Technical field: two-letter code of 'country_id'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__is_same_currency
+msgid "Technical field: whether 'currency_id' is the company currency."
 msgstr ""
 
 #. module: ssi_accounting
@@ -2107,6 +2760,39 @@ msgstr ""
 msgid ""
 "Technical field: whether the form should show the per-company code Mapping "
 "tab."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__posted_before
+msgid ""
+"Technical field: whether this journal entry has ever been posted. Always "
+"false until posting is added by a later unit."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__group_tax_id
+msgid ""
+"Technical field: which 'Group of Taxes' this line was generated for, when "
+"'display_type' is 'tax'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__tax_repartition_line_id
+msgid ""
+"Technical field: which tax repartition line this line was generated from, "
+"when 'display_type' is 'tax'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__tax_line_id
+msgid ""
+"Technical field: which tax this line represents, when 'display_type' is "
+"'tax'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__narration
+msgid "Terms and Conditions"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2133,6 +2819,18 @@ msgid "To Code Prefix"
 msgstr ""
 
 #. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_list
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Total Credit"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_item_view_list
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Total Debit"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__account_type
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__type
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_view_search
@@ -2142,8 +2840,14 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_exception_decoration
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_exception_decoration
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__activity_exception_decoration
 #: model:ir.model.fields,help:ssi_accounting.field_tax__activity_exception_decoration
 msgid "Type of the exception activity on record."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__price_unit
+msgid "Unit Price"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2166,6 +2870,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__sequence
 msgid "Used to order journals in lists."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__sequence
+msgid "Used to order lines within a journal entry."
 msgstr ""
 
 #. module: ssi_accounting
