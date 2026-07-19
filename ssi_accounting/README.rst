@@ -160,17 +160,15 @@ Design decisions
   Odoo 19's own behaviour for ``account.move`` lines of ``move_type ==
   'entry'``. ``product_uom_id`` is dropped (safe: ``tax``'s base-line builder
   already falls back to ``uom.uom`` when it is absent). ``display_type``
-  stays required, shrunk to ``product``/``tax``/``line_section``/``line_note``
-  -- it is the base line vs. tax line discriminator the tax engine relies on.
-* ``account_id`` is deliberately **not** ``required=True``. Exactly upstream
-  ``account.move.line``'s own mechanism, its necessity is enforced by two
-  ``models.Constraint`` SQL ``CHECK``\ s ported verbatim (table name aside):
-  ``_check_accountable_required_fields`` (an account is required for
-  ``product``/``tax`` rows, optional for ``line_section``/``line_note``) and
-  ``_check_non_accountable_fields_null`` (``line_section``/``line_note`` rows
-  must carry no account and no ``debit``/``credit``/``amount_currency``). A
-  plain ``required=True`` on the field would have wrongly forced every
-  cosmetic section/note row to carry an account too.
+  stays required, shrunk to ``product``/``tax`` -- it is the base line vs.
+  tax line discriminator the tax engine relies on. Every
+  ``journal_entry.item`` row is accountable; purely cosmetic, non-accounting
+  rows are not a concept this module supports.
+* ``account_id`` is ``required=True``. Every row being accountable means
+  there is no row that legitimately carries no account, so this module does
+  not need upstream ``account.move.line``'s two ``models.Constraint`` SQL
+  ``CHECK``\ s (conditionally requiring/forbidding an account depending on
+  ``display_type``) -- a plain ``required=True`` on the field is enough.
 * ``debit``/``credit``/``balance``/``amount_currency`` stay consistent
   whichever of the three is filled first. Unlike a first attempt at this
   unit (which made ``balance`` a compute+inverse pair *over*

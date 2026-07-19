@@ -638,9 +638,7 @@ class JournalEntry(models.Model):
                         id=move.id,
                     )
                 )
-            if not move.line_ids.filtered(
-                lambda line: line.display_type not in ("line_section", "line_note")
-            ):
+            if not move.line_ids:
                 problems.append(
                     self.env._("%(name)s has no postable line", name=move.display_name)
                 )
@@ -865,9 +863,9 @@ Solution: The entry is accounted on %(new_date)s instead
     def _prepare_reversal_line_vals(self, line, negate):
         """Build create() vals for one mirror line of a reversal/copy entry.
 
-        Only ever called with a 'product'/'line_section'/'line_note'
-        'line' -- every caller filters out 'tax'-typed lines first, since
-        those are left for the *new* entry's own ``create()``
+        Only ever called with a 'product' 'line' -- every caller filters
+        out 'tax'-typed lines first, since those are left for the *new*
+        entry's own ``create()``
         (``_sync_dynamic_lines``/``_sync_tax_lines``) to regenerate from
         scratch, driven by that entry's own 'is_refund' flag (selecting
         the reverse repartition lines for a true reversal, the base ones
