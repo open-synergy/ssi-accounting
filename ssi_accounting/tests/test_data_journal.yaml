@@ -57,7 +57,7 @@ scenarios:
         values:
           name: "Situation Journal"
           type: "situation"
-      - step: "Assert entry_count is zero (account.move does not exist yet)"
+      - step: "Assert entry_count is zero (no journal entry created yet)"
         action: "assert"
         target: "journal"
         asserts:

@@ -245,7 +245,7 @@ scenarios:
             type: "value"
             expected: true
 
-  - name: "is_used is always false while account.move.line does not exist"
+  - name: "is_used is false when no journal item uses the tax yet"
     steps:
       - step: "Create a tax group"
         action: "create"

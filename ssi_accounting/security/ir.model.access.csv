@@ -13,6 +13,10 @@ access_account_journal_all,account.journal - all,model_account_journal,base.grou
 access_account_journal_manager,account.journal - manager,model_account_journal,group_accounting_manager,1,1,1,1
 access_account_journal_group_all,account.journal.group - all,model_account_journal_group,base.group_user,1,0,0,0
 access_account_journal_group_manager,account.journal.group - manager,model_account_journal_group,group_accounting_manager,1,1,1,1
+access_journal_entry_all,journal_entry - all,model_journal_entry,base.group_user,1,0,0,0
+access_journal_entry_user,journal_entry - user,model_journal_entry,group_accounting_user,1,1,1,1
+access_journal_entry_item_all,journal_entry.item - all,model_journal_entry_item,base.group_user,1,0,0,0
+access_journal_entry_item_user,journal_entry.item - user,model_journal_entry_item,group_accounting_user,1,1,1,1
 access_tax_group_all,tax_group - all,model_tax_group,base.group_user,1,0,0,0
 access_tax_group_manager,tax_group - manager,model_tax_group,group_accounting_manager,1,1,1,1
 access_tax_all,tax - all,model_tax,base.group_user,1,0,0,0

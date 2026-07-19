@@ -9,6 +9,8 @@ from . import (
     account_root,
     account_tag,
     journal,
+    journal_entry,
+    journal_entry_item,
     journal_group,
     mixin_sequence_number,
     res_company,

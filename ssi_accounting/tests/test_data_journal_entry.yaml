@@ -1,0 +1,376 @@
+options:
+  auto_refresh: true
+
+setup:
+  steps:
+    - step: "Create a journal"
+      action: "create"
+      model: "account.journal"
+      save_as: "journal"
+      values:
+        name: "General Journal"
+        type: "general"
+    - step: "Create the debit-side account"
+      action: "create"
+      model: "account.account"
+      save_as: "acc_a"
+      values:
+        name: "Account A"
+        account_type: "asset_current"
+        code: "JE0001"
+    - step: "Create the credit-side account"
+      action: "create"
+      model: "account.account"
+      save_as: "acc_b"
+      values:
+        name: "Account B"
+        account_type: "income"
+        code: "JE0002"
+
+scenarios:
+  - name: "Two-line balanced entry can be saved in draft"
+    steps:
+      - step: "Create a balanced entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 100.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 100.0
+      - step: "Assert state is draft"
+        action: "assert"
+        target: "entry"
+        asserts:
+          state:
+            type: "value"
+            expected: "draft"
+      - step: "Assert amount_total_debit equals amount_total_credit"
+        action: "assert"
+        target: "entry"
+        asserts:
+          amount_total_debit:
+            type: "value"
+            expected: 100.0
+          amount_total_credit:
+            type: "value"
+            expected: 100.0
+
+  - name: "Filling debit/credit computes balance and amount_currency (same currency)"
+    steps:
+      - step: "Create an entry with a debit line"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 250.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 250.0
+      - step: "Find the debit line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
+        save_as: "debit_line"
+        limit: 1
+      - step: "Assert balance and amount_currency mirror debit"
+        action: "assert"
+        target: "debit_line"
+        asserts:
+          balance:
+            type: "value"
+            expected: 250.0
+          amount_currency:
+            type: "value"
+            expected: 250.0
+          is_same_currency:
+            type: "value"
+            expected: true
+
+  - name: "Filling balance directly derives debit/credit (second fill direction)"
+    steps:
+      - step: "Create an entry, one line filled via balance"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                balance: 80.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                balance: -80.0
+      - step: "Find the line filled via balance"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
+        save_as: "balance_line"
+        limit: 1
+      - step: "Assert debit/credit were derived from balance"
+        action: "assert"
+        target: "balance_line"
+        asserts:
+          debit:
+            type: "value"
+            expected: 80.0
+          credit:
+            type: "value"
+            expected: 0.0
+
+  - name: "Foreign-currency line fills currency_rate/amount_currency, third fill direction back-computes balance"
+    steps:
+      - step: "Create a foreign currency"
+        action: "create"
+        model: "res.currency"
+        save_as: "fcu"
+        values:
+          name: "FCU"
+          symbol: "F"
+          rounding: 0.01
+      - step: "Set today's conversion rate to 2.0 for the foreign currency"
+        action: "create"
+        model: "res.currency.rate"
+        values:
+          currency_id: "REC: fcu.id"
+          rate: 2.0
+          name: "EVAL: date.today()"
+      - step: "Create an entry with one foreign-currency line filled via amount_currency"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                currency_id: "REC: fcu.id"
+                amount_currency: 200.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 100.0
+      - step: "Find the foreign-currency line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
+        save_as: "fx_line"
+        limit: 1
+      - step: "Assert currency_rate is 2.0 and balance was back-computed to 100.0"
+        action: "assert"
+        target: "fx_line"
+        asserts:
+          currency_rate:
+            type: "value"
+            expected: 2.0
+          balance:
+            type: "value"
+            expected: 100.0
+          debit:
+            type: "value"
+            expected: 100.0
+          is_same_currency:
+            type: "value"
+            expected: false
+
+  - name: "product_id/quantity/price_unit are informational: price_subtotal follows amount_currency"
+    steps:
+      - step: "Create an entry with a product-informed line"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 60.0
+                credit: 0.0
+                quantity: 3.0
+                price_unit: 1000.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 60.0
+      - step: "Find the product-informed line"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["move_id", "=", "REC: entry.id"], ["account_id", "=", "REC: acc_a.id"]]
+        save_as: "product_line"
+        limit: 1
+      - step: "Assert price_subtotal mirrors amount_currency, not quantity * price_unit"
+        action: "assert"
+        target: "product_line"
+        asserts:
+          price_subtotal:
+            type: "value"
+            expected: 60.0
+          price_total:
+            type: "value"
+            expected: 60.0
+
+  - name: "Deleting the header deletes its lines"
+    steps:
+      - step: "Create a balanced entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 40.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 40.0
+      - step: "Delete the journal entry"
+        action: "unlink"
+        target: "entry"
+      - step: "Verify no journal item survives"
+        action: "search"
+        model: "journal_entry.item"
+        domain: [["account_id", "=", "REC: acc_a.id"], ["debit", "=", 40.0]]
+        save_as: "orphans"
+        expect_count: 0
+
+  - name: "An unbalanced entry is rejected with an SSI-formatted error"
+    steps:
+      - step: "Creating an unbalanced entry is rejected"
+        action: "create"
+        model: "journal_entry"
+        expect_error:
+          type: "UserError"
+          message_contains: "Context: Save journal entry"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 100.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 90.0
+
+  - name: "A line whose account belongs to another company is rejected"
+    steps:
+      - step: "Create a second company"
+        action: "create"
+        model: "res.company"
+        save_as: "company_b"
+        values:
+          name: "Second Accounting Company"
+      - step: "Create an account belonging only to the second company"
+        action: "create"
+        model: "account.account"
+        save_as: "foreign_account"
+        context:
+          allowed_company_ids: ["REC: company_b.id"]
+        values:
+          name: "Foreign Account"
+          code: "JEFOREIGN1"
+          account_type: "income"
+          company_ids: [[6, 0, ["REC: company_b.id"]]]
+      - step: "Creating an entry with a cross-company line is rejected"
+        action: "create"
+        model: "journal_entry"
+        expect_error:
+          type: "UserError"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 20.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: foreign_account.id"
+                debit: 0.0
+                credit: 20.0
+
+  - name: "A line without an account_id is rejected"
+    steps:
+      - step: "Creating an entry with a line lacking account_id is rejected"
+        action: "create"
+        model: "journal_entry"
+        expect_error:
+          type: "ValidationError"
+        values:
+          journal_id: "REC: journal.id"
+          line_ids:
+            - - 0
+              - 0
+              - debit: 10.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 10.0
+
+  - name: "Edit a journal entry's reference"
+    steps:
+      - step: "Create a balanced entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          ref: "Original Ref"
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 15.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 15.0
+      - step: "Update the reference"
+        action: "write"
+        target: "entry"
+        values:
+          ref: "Updated Ref"
+      - step: "Assert ref updated"
+        action: "assert"
+        target: "entry"
+        asserts:
+          ref:
+            type: "value"
+            expected: "Updated Ref"

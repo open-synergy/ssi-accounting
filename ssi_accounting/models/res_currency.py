@@ -20,10 +20,10 @@ class ResCurrency(models.Model):
     precision), this guard blocks **deactivating** a currency that has
     accounting entries -- see the acceptance criteria of the issue this
     was built for. ``_has_accounting_entries`` looks at
-    ``account.move.line``, a model that does not exist yet in this repo's
-    scope (it lands together with ``account``/``journal`` in a later
-    unit), so the guard is a no-op until then: with no journal items
-    possible, deactivating any currency succeeds.
+    ``journal_entry.item`` (originally written against the placeholder
+    name ``account.move.line`` before the journal entry unit settled on
+    ``journal_entry.item``), which now exists, so this guard works for
+    real.
     """
 
     _inherit = "res.currency"
@@ -47,18 +47,17 @@ Solution: Keep the currency active, or first remove/reassign the
         return super().write(vals)
 
     def _has_accounting_entries(self):
-        """Whether this currency has been used to generate move lines.
+        """Whether this currency has been used to generate journal items.
 
         :return: ``True`` iff this currency was used, either as the
             foreign currency or as the company currency, on at least one
-            ``account.move.line``. Always ``False`` while
-            ``account.move.line`` does not exist yet.
+            ``journal_entry.item``.
         """
         self.ensure_one()
-        if "account.move.line" not in self.env:
+        if "journal_entry.item" not in self.env:
             return False
         return bool(
-            self.env["account.move.line"]
+            self.env["journal_entry.item"]
             .sudo()
             .search_count(
                 [

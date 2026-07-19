@@ -39,17 +39,20 @@ class AccountJournal(models.Model):
     and ``has_invalid_statements``. Adding a type back later is additive
     and does not require touching what is kept here.
 
-    ``entry_count`` (always 0 until ``account.move`` lands) replaces the
-    whole upstream dashboard (``account_journal_dashboard.py``): a single
-    smart button to the journal's entries is enough for this repo's scope
-    -- the KPI/graph dashboard widget is not ported at all.
+    ``entry_count`` replaces the whole upstream dashboard
+    (``account_journal_dashboard.py``): a single smart button to the
+    journal's entries is enough for this repo's scope -- the KPI/graph
+    dashboard widget is not ported at all.
 
-    Every method below that references ``account.move`` (a model that
-    does not exist yet in this repo) is guarded on ``"account.move" not
-    in self.env``, exactly like ``account.py`` and ``account_group.py``
-    already guard their own forward references -- each guard is a no-op
-    today and starts doing real work the moment ``account.move`` lands,
-    with no further change needed here.
+    **``journal_entry`` now exists** (added by the journal entry unit):
+    every method below that references it was guarded on
+    ``"journal_entry" not in self.env`` (originally written against the
+    placeholder name ``account.move`` before this issue's Keputusan
+    Desain settled on ``journal_entry``) while that model did not exist
+    yet, exactly like ``account.py``/``account_group.py`` guard their own
+    forward references -- those guards now work for real, no further
+    change needed beyond pointing them at the actual model/table names
+    (``journal_entry``/``journal_entry_item``).
     """
 
     _name = "account.journal"
@@ -149,8 +152,7 @@ class AccountJournal(models.Model):
     )
     entry_count = fields.Integer(
         compute="_compute_entry_count",
-        help="Number of journal entries posted on this journal. Always "
-        "0 until 'account.move' is added in a later unit.",
+        help="Number of journal entries linked to this journal.",
     )
 
     @api.depends("company_id")
@@ -204,22 +206,22 @@ Solution: Set the journal code manually
 
     @api.depends_context("company")
     def _compute_entry_count(self):
-        if "account.move" not in self.env:
+        if "journal_entry" not in self.env:
             self.entry_count = 0
             return
         for journal in self:
-            journal.entry_count = self.env["account.move"].search_count(
+            journal.entry_count = self.env["journal_entry"].search_count(
                 [("journal_id", "=", journal.id)]
             )
 
     def action_open_journal_entries(self):
         self.ensure_one()
-        if "account.move" not in self.env:
+        if "journal_entry" not in self.env:
             return {"type": "ir.actions.act_window_close"}
         return {
             "type": "ir.actions.act_window",
             "name": self.env._("Journal Entries"),
-            "res_model": "account.move",
+            "res_model": "journal_entry",
             "views": [[False, "list"], [False, "form"]],
             "domain": [("journal_id", "=", self.id)],
         }
@@ -246,14 +248,14 @@ Solution: Pick a different default account
 
     @api.constrains("company_id")
     def _check_company_consistency(self):
-        if not self or "account.move" not in self.env:
+        if not self or "journal_entry" not in self.env:
             return
-        self.env["account.move"].flush_model(["journal_id", "company_id"])
+        self.env["journal_entry"].flush_model(["journal_id", "company_id"])
         self.flush_model(["company_id"])
         self.env.cr.execute(
             """
             SELECT move.id
-              FROM account_move move
+              FROM journal_entry move
               JOIN account_journal journal ON journal.id = move.journal_id
              WHERE move.journal_id IN %(journal_ids)s
                AND move.company_id != journal.company_id
@@ -334,10 +336,10 @@ Solution: Keep the current company, or first reassign the journal
         return super().create(vals_list)
 
     def write(self, vals):
-        if "company_id" in vals and "account.move" in self.env:
+        if "company_id" in vals and "journal_entry" in self.env:
             for journal in self:
                 if journal.company_id.id != vals["company_id"] and self.env[
-                    "account.move"
+                    "journal_entry"
                 ].sudo().search_count([("journal_id", "=", journal.id)], limit=1):
                     raise UserError(
                         self.env._(
@@ -356,10 +358,10 @@ Solution: Keep the current company, or create a new journal in the
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_contains_journal_entries(self):
-        if "account.move" not in self.env:
+        if "journal_entry" not in self.env:
             return
         if (
-            self.env["account.move"]
+            self.env["journal_entry"]
             .sudo()
             .search_count([("journal_id", "in", self.ids)], limit=1)
         ):
