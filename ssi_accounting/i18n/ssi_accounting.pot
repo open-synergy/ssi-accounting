@@ -169,6 +169,36 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid ""
+"\n"
+"Context: Reconcile journal items in different currencies\n"
+"Problem: No exchange difference journal is configured for this company\n"
+"Solution: Set the \"Exchange Difference Journal\" in the company's Currency Exchange settings, then reconcile again\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid ""
+"\n"
+"Context: Reconcile journal items in different currencies\n"
+"Problem: No gain exchange rate account is configured for this company\n"
+"Solution: Set the \"Gain Exchange Rate Account\" in the company's Currency Exchange settings, then reconcile again\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid ""
+"\n"
+"Context: Reconcile journal items in different currencies\n"
+"Problem: No loss exchange rate account is configured for this company\n"
+"Solution: Set the \"Loss Exchange Rate Account\" in the company's Currency Exchange settings, then reconcile again\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/wizards/journal_entry_reversal.py:0
 msgid ""
 "\n"
@@ -1282,6 +1312,20 @@ msgid "Currency Rate"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__exchange_move_ids
+msgid ""
+"Currency exchange difference entries generated for this line by "
+"'reconcile_partial'/'journal_entry.item._create_exchange_difference_moves' "
+"-- empty for a line never reconciled across currencies."
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry_item.py:0
+msgid "Currency exchange rate difference"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__company_currency_id
 msgid ""
 "Currency of the active company, used to display monetary fields on this "
@@ -1512,6 +1556,7 @@ msgid "Exchange Difference Journal"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__exchange_move_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_reconcile_partial__exchange_move_id
 msgid "Exchange Move"
 msgstr ""
@@ -1559,6 +1604,16 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__res_company__fiscalyear_last_month__2
 msgid "February"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__exchange_diff_partial_ids
+msgid ""
+"Field penghubung: the 'reconcile_partial' row(s) whose cross-currency "
+"matching generated this entry -- set by "
+"'journal_entry.item._reconcile_plan_with_sync' once "
+"'journal_entry.item._create_exchange_difference_moves' returns. Empty for a "
+"journal entry that is not itself an exchange difference entry."
 msgstr ""
 
 #. module: ssi_accounting
@@ -2657,6 +2712,11 @@ msgid "Refund Method"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__exchange_diff_partial_ids
+msgid "Related Partials"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__related_taxes_amount
 msgid "Related Taxes Amount"
 msgstr ""
@@ -3297,14 +3357,6 @@ msgid "Technical field: the company's tax rounding method."
 msgstr ""
 
 #. module: ssi_accounting
-#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__exchange_move_id
-msgid ""
-"Technical field: the currency exchange difference entry generated for this "
-"partial. Never populated by this unit -- see the class docstring -- filled "
-"by a later, dedicated currency unit."
-msgstr ""
-
-#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry__highest_name
 msgid ""
 "Technical field: the last sequence number issued so far in this entry's "
@@ -3430,6 +3482,15 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__credit_move_id
 msgid "The credit-side journal item matched by this partial reconcile."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_reconcile_partial__exchange_move_id
+msgid ""
+"The currency exchange difference entry generated for this partial, if any --"
+" set by 'journal_entry.item._reconcile_plan_with_sync' once "
+"'journal_entry.item._create_exchange_difference_moves' returns. Empty for a "
+"partial that matched without a cross-currency residual to fix."
 msgstr ""
 
 #. module: ssi_accounting
