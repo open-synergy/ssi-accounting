@@ -50,6 +50,18 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/journal.py:0
+msgid ""
+"\n"
+"Context: Delete journal\n"
+"Database ID: %(database_id)s\n"
+"Problem: This journal already has journal entries\n"
+"Solution: Remove or reassign the journal entries before deleting the\n"
+"    journal\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/models/account.py:0
 msgid ""
 "\n"
@@ -68,6 +80,17 @@ msgid ""
 "Database ID: %(database_id)s\n"
 "Problem: Cannot generate an unused account code from %(start_code)s\n"
 "Solution: Set the account code manually\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal.py:0
+msgid ""
+"\n"
+"Context: Generate new journal code\n"
+"Database ID: %(database_id)s\n"
+"Problem: Cannot generate an unused journal code for company %(company)s\n"
+"Solution: Set the journal code manually\n"
 msgstr ""
 
 #. module: ssi_accounting
@@ -180,6 +203,18 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/journal.py:0
+msgid ""
+"\n"
+"Context: Save journal\n"
+"Database ID: %(database_id)s\n"
+"Problem: The default account of a journal cannot be of type Receivable\n"
+"    or Payable\n"
+"Solution: Pick a different default account\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/models/account.py:0
 msgid ""
 "\n"
@@ -206,6 +241,32 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/journal.py:0
+msgid ""
+"\n"
+"Context: Update journal company\n"
+"Database ID: %(database_id)s\n"
+"Problem: This journal already contains journal entries, therefore its\n"
+"    company cannot be changed\n"
+"Solution: Keep the current company, or create a new journal in the\n"
+"    target company instead\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal.py:0
+msgid ""
+"\n"
+"Context: Update journal company\n"
+"Database ID: %(database_id)s\n"
+"Problem: This journal already has journal entries linked to a different\n"
+"    company\n"
+"Solution: Keep the current company, or first reassign the journal\n"
+"    entries\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/models/mixin_sequence_number.py:0
 msgid ""
 "\n"
@@ -226,8 +287,19 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/journal.py:0
+msgid "%(name)s (copy)"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/models/mixin_sequence_number.py:0
 msgid "%s is not a stored field"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_view_form
+msgid "<span class=\"o_stat_text\">Entries</span>"
 msgstr ""
 
 #. module: ssi_accounting
@@ -318,6 +390,34 @@ msgid "Account this code mapping row belongs to."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__default_account_id
+msgid ""
+"Account used as the counterpart when a journal entry line does not specify "
+"one. Auto-created when left empty."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__suspense_account_id
+msgid ""
+"Account used to post amounts that cannot be immediately reconciled. Defaults"
+" to the company's suspense account."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_res_company__income_currency_exchange_account_id
+msgid ""
+"Account used to post the gain when reconciling entries in different "
+"currencies."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_res_company__expense_currency_exchange_account_id
+msgid ""
+"Account used to post the loss when reconciling entries in different "
+"currencies."
+msgstr ""
+
+#. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Account with Entries"
 msgstr ""
@@ -340,32 +440,38 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_needaction
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_needaction
 msgid "Action Needed"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__active
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__active
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__active
 msgid "Active"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_ids
 msgid "Activities"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_exception_decoration
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_exception_decoration
 msgid "Activity Exception Decoration"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_state
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_state
 msgid "Activity State"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_type_icon
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_type_icon
 msgid "Activity Type Icon"
 msgstr ""
 
@@ -384,6 +490,16 @@ msgstr ""
 msgid ""
 "An account is part of a ledger allowing your company to\n"
 "                register all kinds of debit and credit transactions."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.constraint,message:ssi_accounting.constraint_account_journal_group_name_company_uniq
+msgid "Another journal group with that name already exists in this company."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.constraint,message:ssi_accounting.constraint_account_journal_code_company_uniq
+msgid "Another journal with that code already exists in this company."
 msgstr ""
 
 #. module: ssi_accounting
@@ -428,6 +544,7 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_attachment_count
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_attachment_count
 msgid "Attachment Count"
 msgstr ""
 
@@ -524,7 +641,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_code_mapping__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__company_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__company_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__company_id
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_group_view_search
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_group_view_search
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_view_search
 msgid "Company"
 msgstr ""
 
@@ -538,6 +659,16 @@ msgstr ""
 msgid ""
 "Company that owns this account group. Every account group is strictly scoped"
 " to one company."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal_group__company_id
+msgid "Company that owns this journal group."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__company_id
+msgid "Company this journal belongs to."
 msgstr ""
 
 #. module: ssi_accounting
@@ -568,6 +699,8 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__create_uid
 msgid "Created by"
@@ -576,6 +709,8 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__create_date
 msgid "Created on"
@@ -588,7 +723,13 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_res_currency
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__currency_id
 msgid "Currency"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.view_company_form_inherit_ssi_accounting
+msgid "Currency Exchange"
 msgstr ""
 
 #. module: ssi_accounting
@@ -636,6 +777,16 @@ msgid "December"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__default_account_id
+msgid "Default Account"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__default_account_type
+msgid "Default Account Type"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__account_price_include
 msgid "Default Sales Price Include"
 msgstr ""
@@ -645,6 +796,11 @@ msgstr ""
 msgid ""
 "Default on whether the sales price used on products and invoices of this "
 "company includes its taxes."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_res_company__account_journal_suspense_account_id
+msgid "Default suspense account proposed on new journals of this company."
 msgstr ""
 
 #. module: ssi_accounting
@@ -661,6 +817,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_code_mapping__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_root__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__display_name
@@ -683,10 +841,25 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__entry_count
+msgid "Entry Count"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__equity
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__internal_group__equity
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Equity"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_res_company__currency_exchange_journal_id
+msgid "Exchange Difference Journal"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__excluded_journal_ids
+msgid "Excluded Journals"
 msgstr ""
 
 #. module: ssi_accounting
@@ -738,17 +911,27 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_follower_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_follower_ids
 msgid "Followers"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_partner_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_partner_ids
 msgid "Followers (Partners)"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_type_icon
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_type_icon
 msgid "Font awesome icon e.g. fa-tasks"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__currency_id
+msgid ""
+"Forces all journal entries of this journal to use a specific currency. Leave"
+" empty to allow any currency."
 msgstr ""
 
 #. module: ssi_accounting
@@ -769,6 +952,11 @@ msgid "From Code Prefix"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_res_company__income_currency_exchange_account_id
+msgid "Gain Exchange Rate Account"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__fiscalyear_lock_date
 msgid "Global Lock Date"
 msgstr ""
@@ -779,7 +967,13 @@ msgid "Group"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__journal_group_ids
+msgid "Groups this journal belongs to, used to filter the journal list."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__has_message
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__has_message
 msgid "Has Message"
 msgstr ""
 
@@ -787,6 +981,8 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_code_mapping__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_root__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__id
@@ -798,27 +994,36 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_exception_icon
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_exception_icon
 msgid "Icon"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_exception_icon
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_exception_icon
 msgid "Icon to indicate an exception activity."
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_needaction
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_needaction
 msgid "If checked, new messages require your attention."
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_has_error
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_has_error
 msgid "If checked, some messages have a delivery error."
 msgstr ""
 
 #. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Inactive Accounts"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_view_search
+msgid "Inactive Journals"
 msgstr ""
 
 #. module: ssi_accounting
@@ -848,12 +1053,58 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_is_follower
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_is_follower
 msgid "Is Follower"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__res_company__fiscalyear_last_month__1
 msgid "January"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_account_journal
+msgid "Journal"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal.py:0
+msgid "Journal Entries"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_account_journal_group
+msgid "Journal Group"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.actions.act_window,name:ssi_accounting.journal_group_action
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__journal_group_ids
+#: model:ir.ui.menu,name:ssi_accounting.journal_group_menu
+msgid "Journal Groups"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_res_company__account_journal_suspense_account_id
+msgid "Journal Suspense Account"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_res_company__currency_exchange_journal_id
+msgid "Journal used to post automatic currency exchange difference entries."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.actions.act_window,name:ssi_accounting.journal_action
+#: model:ir.ui.menu,name:ssi_accounting.journal_menu
+msgid "Journals"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal_group__excluded_journal_ids
+msgid ""
+"Journals hidden from view whenever this group is the active journal filter."
 msgstr ""
 
 #. module: ssi_accounting
@@ -867,6 +1118,14 @@ msgid "June"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__default_account_type
+msgid ""
+"Kept for naming symmetry with upstream's Many2one field of the same name. "
+"This module only has the generic 'general' journal category, so it is "
+"reduced to a constant label."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_group__name
 msgid "Label of the account group, shown together with its code prefix range."
 msgstr ""
@@ -874,6 +1133,18 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__name
 msgid "Label of the account, shown throughout the chart of accounts."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal_group__name
+msgid ""
+"Label of the journal group, used to filter journals by group in the journal "
+"list and in reports."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__name
+msgid "Label of the journal, shown throughout the accounting app."
 msgstr ""
 
 #. module: ssi_accounting
@@ -886,6 +1157,8 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__write_uid
 msgid "Last Updated by"
@@ -894,6 +1167,8 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__write_date
 msgid "Last Updated on"
@@ -908,6 +1183,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.view_company_form_inherit_ssi_accounting
 msgid "Lock Dates"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_res_company__expense_currency_exchange_account_id
+msgid "Loss Exchange Rate Account"
 msgstr ""
 
 #. module: ssi_accounting
@@ -944,12 +1224,26 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_has_error
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_has_error
 msgid "Message Delivery error"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_ids
 msgid "Messages"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__account_journal__type__general
+msgid "Miscellaneous"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__type
+msgid ""
+"Miscellaneous for day-to-day manual entries, Opening/Closing for fiscal year"
+" opening and closing entries."
 msgstr ""
 
 #. module: ssi_accounting
@@ -959,27 +1253,33 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__my_activity_date_deadline
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__my_activity_date_deadline
 msgid "My Activity Deadline"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__name
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__name
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_root__name
 msgid "Name"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_date_deadline
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_date_deadline
 msgid "Next Activity Deadline"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_summary
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_summary
 msgid "Next Activity Summary"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_type_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_type_id
 msgid "Next Activity Type"
 msgstr ""
 
@@ -1005,21 +1305,32 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_needaction_counter
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_needaction_counter
 msgid "Number of Actions"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_has_error_counter
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_has_error_counter
 msgid "Number of errors"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__entry_count
+msgid ""
+"Number of journal entries posted on this journal. Always 0 until "
+"'account.move' is added in a later unit."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_needaction_counter
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_needaction_counter
 msgid "Number of messages requiring action"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_has_error_counter
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_has_error_counter
 msgid "Number of messages with delivery error"
 msgstr ""
 
@@ -1041,6 +1352,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__off_balance
 msgid "Off-Balance Sheet"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__account_journal__type__situation
+msgid "Opening/Closing"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1104,6 +1420,7 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_user_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_user_id
 msgid "Responsible User"
 msgstr ""
 
@@ -1146,9 +1463,20 @@ msgid "September"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__sequence
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__sequence
+msgid "Sequence"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__sequence_number
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__sequence_number
 msgid "Sequence Number"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__sequence_override_regex
+msgid "Sequence Override Regex"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1168,6 +1496,23 @@ msgid "Set active to false to hide the account without removing it."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__active
+msgid "Set active to false to hide the journal without removing it."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__code
+msgid "Short Code"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__code
+msgid ""
+"Short, unique-per-company code used to prefix journal entry numbers. Auto-"
+"generated when left empty."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_group__code_prefix_start
 msgid ""
 "Starting account code prefix covered by this group. Defaults to the ending "
@@ -1184,11 +1529,17 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_state
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_state
 msgid ""
 "Status based on activities\n"
 "Overdue: Due date is already passed\n"
 "Today: Activity date is today\n"
 "Planned: Future activities."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__suspense_account_id
+msgid "Suspense Account"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1231,6 +1582,14 @@ msgid "Taxes"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__sequence_override_regex
+msgid ""
+"Technical field read by 'mixin.sequence_number' (once a concrete numbered "
+"document is wired to a journal) to enforce a custom sequence composition the"
+" mixin would otherwise misinterpret."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__display_mapping_tab
 msgid ""
 "Technical field: whether the form should show the per-company code Mapping "
@@ -1262,11 +1621,14 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__account_type
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__type
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_view_search
 msgid "Type"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_exception_decoration
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_exception_decoration
 msgid "Type of the exception activity on record."
 msgstr ""
 
@@ -1280,6 +1642,16 @@ msgstr ""
 msgid ""
 "Used for information purposes and to derive internal_group and the default "
 "reconcile flag."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal_group__sequence
+msgid "Used to order journal groups when filtering journals."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_account_journal__sequence
+msgid "Used to order journals in lists."
 msgstr ""
 
 #. module: ssi_accounting
