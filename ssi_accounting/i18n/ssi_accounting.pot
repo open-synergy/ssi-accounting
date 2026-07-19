@@ -95,6 +95,27 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid ""
+"\n"
+"Context: Post journal entry\n"
+"Database ID: %(database_id)s\n"
+"Problem: The date %(old_date)s falls within a locked period (%(lock_date_info)s)\n"
+"Solution: The entry is accounted on %(new_date)s instead\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid ""
+"\n"
+"Context: Post journal entry\n"
+"Problem: %(problems)s\n"
+"Solution: Fix the listed issue(s), then post again\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/models/account.py:0
 msgid ""
 "\n"
@@ -317,6 +338,42 @@ msgstr ""
 #: code:addons/ssi_accounting/models/journal.py:0
 #: code:addons/ssi_accounting/models/tax.py:0
 msgid "%(name)s (copy)"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "%(name)s (id %(id)s) must be in draft"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "%(name)s has no postable line"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "%(name)s posts to the archived journal %(journal)s"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "%(name)s uses account(s) from a different company: %(accounts)s"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "%(name)s uses the archived account(s) %(accounts)s"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "%(name)s uses the archived currency %(currency)s"
 msgstr ""
 
 #. module: ssi_accounting
@@ -638,6 +695,11 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.constraint,message:ssi_accounting.constraint_journal_entry_unique_name
+msgid "Another entry with the same name already exists."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.constraint,message:ssi_accounting.constraint_account_journal_group_name_company_uniq
 msgid "Another journal group with that name already exists in this company."
 msgstr ""
@@ -675,6 +737,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__res_company__fiscalyear_last_month__4
 msgid "April"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Are you sure you want to cancel this journal entry?"
 msgstr ""
 
 #. module: ssi_accounting
@@ -757,6 +824,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__internal_group
 msgid "Broad accounting group derived from account_type."
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Cancel"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1414,6 +1486,16 @@ msgid "Has Negative Factor"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__has_reconciled_entries
+msgid "Has Reconciled Entries"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__highest_name
+msgid "Highest Name"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax__repartition_line_reverse_ids
 msgid ""
 "How this tax's amount is split across accounts when the journal entry it was"
@@ -1785,6 +1867,11 @@ msgid "Loss Exchange Rate Account"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__made_sequence_gap
+msgid "Made Sequence Gap"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:res.groups,name:ssi_accounting.group_accounting_manager
 msgid "Manager"
 msgstr ""
@@ -1890,6 +1977,11 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry_item__move_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__name
 msgid "Name"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__name_placeholder
+msgid "Name Placeholder"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2001,6 +2093,18 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__off_balance
 msgid "Off-Balance Sheet"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "Only draft or posted journal entries can be cancelled."
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "Only posted or cancelled journal entries can be reset to draft."
 msgstr ""
 
 #. module: ssi_accounting
@@ -2125,6 +2229,11 @@ msgid "Percentage Tax Included"
 msgstr ""
 
 #. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Post"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__journal_entry__state__posted
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_search
 msgid "Posted"
@@ -2148,6 +2257,13 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__asset_prepayments
 msgid "Prepayments"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__name_placeholder
+msgid ""
+"Preview of the number this entry will get once posted, shown in the form "
+"while 'name' itself is still empty."
 msgstr ""
 
 #. module: ssi_accounting
@@ -2194,15 +2310,13 @@ msgid "Reference"
 msgstr ""
 
 #. module: ssi_accounting
-#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__name
-msgid ""
-"Reference/number of this journal entry. Stays '/' until a later unit adds "
-"automatic numbering -- fill it in manually until then."
+#: model:ir.model.fields,field_description:ssi_accounting.field_account_account__related_taxes_amount
+msgid "Related Taxes Amount"
 msgstr ""
 
 #. module: ssi_accounting
-#: model:ir.model.fields,field_description:ssi_accounting.field_account_account__related_taxes_amount
-msgid "Related Taxes Amount"
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_entry_view_form
+msgid "Reset to Draft"
 msgstr ""
 
 #. module: ssi_accounting
@@ -2249,6 +2363,7 @@ msgid "Round per Tax"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__sequence_number
 #: model:ir.model.fields,help:ssi_accounting.field_mixin_sequence_number__sequence_number
 #: model:ir.model.fields,help:ssi_accounting.field_test_mixin_sequence_number__sequence_number
 msgid ""
@@ -2290,6 +2405,7 @@ msgid "Sequence"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__sequence_number
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__sequence_number
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__sequence_number
 msgid "Sequence Number"
@@ -2301,6 +2417,7 @@ msgid "Sequence Override Regex"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__sequence_prefix
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__sequence_prefix
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__sequence_prefix
 msgid "Sequence Prefix"
@@ -2346,6 +2463,11 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_journal_entry__show_reset_to_draft_button
+msgid "Show Reset To Draft Button"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry_item__amount_currency
 msgid ""
 "Signed amount expressed in 'currency_id'. Equal to 'balance' when the line's"
@@ -2382,6 +2504,7 @@ msgid "State"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__sequence_prefix
 #: model:ir.model.fields,help:ssi_accounting.field_mixin_sequence_number__sequence_prefix
 #: model:ir.model.fields,help:ssi_accounting.field_test_mixin_sequence_number__sequence_prefix
 msgid ""
@@ -2409,8 +2532,16 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry__state
 msgid ""
-"Status of this journal entry. Posting/cancelling is added by a later unit --"
-" every entry stays 'draft' for now."
+"Status of this journal entry: 'draft' can still be edited freely, 'posted' "
+"is final and numbered, 'cancel' is void."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__name
+msgid ""
+"Statutory number of this journal entry, assigned automatically on posting --"
+" gapless per journal, resetting yearly (see 'mixin.sequence_number'). Stays "
+"empty while 'draft'; 'name_placeholder' previews the number it will get."
 msgstr ""
 
 #. module: ssi_accounting
@@ -2739,6 +2870,14 @@ msgid "Technical field: the company's tax rounding method."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__highest_name
+msgid ""
+"Technical field: the last sequence number issued so far in this entry's "
+"journal, used to compute 'name_placeholder' and to adjust the accounting "
+"date on posting."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_tax_group__country_code
 msgid "Technical field: two-letter code of 'country_id'."
 msgstr ""
@@ -2756,6 +2895,13 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__show_reset_to_draft_button
+msgid ""
+"Technical field: whether the 'Reset to Draft' button should be shown -- true"
+" for posted or cancelled entries."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__display_mapping_tab
 msgid ""
 "Technical field: whether the form should show the per-company code Mapping "
@@ -2763,10 +2909,26 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__made_sequence_gap
+msgid ""
+"Technical field: whether this entry breaks the numbering chain of its "
+"journal. Declared for forward compatibility but not maintained by any "
+"cascade in this unit -- see the class docstring."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_journal_entry__has_reconciled_entries
+msgid ""
+"Technical field: whether this entry has reconciled journal items, used to "
+"guard 'button_draft'. Always false until a later reconciliation unit adds "
+"the fields it reads."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_journal_entry__posted_before
 msgid ""
-"Technical field: whether this journal entry has ever been posted. Always "
-"false until posting is added by a later unit."
+"Technical field: whether this journal entry has ever been posted. Stays true"
+" after a 'button_draft' reset."
 msgstr ""
 
 #. module: ssi_accounting
@@ -2941,6 +3103,18 @@ msgstr ""
 msgid ""
 "Whether this tax is already used on at least one journal item. Always false "
 "while journal items do not exist yet."
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "You cannot reset to draft a journal entry that has reconciled entries."
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
+#: code:addons/ssi_accounting/models/journal_entry.py:0
+msgid "You don't have the access rights to post a journal entry."
 msgstr ""
 
 #. module: ssi_accounting
