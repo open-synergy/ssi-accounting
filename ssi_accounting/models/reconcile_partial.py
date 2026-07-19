@@ -75,6 +75,7 @@ class ReconcilePartial(models.Model):
         string="Company Currency",
         compute="_compute_currencies",
         store=True,
+        precompute=True,
         compute_sudo=True,
         help="Currency 'amount' is expressed in -- the company currency "
         "of this partial (see 'company_id').",
