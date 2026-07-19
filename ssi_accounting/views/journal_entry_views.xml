@@ -19,12 +19,31 @@
                     string="Posted"
                     domain="[('state', '=', 'posted')]"
                 />
+                <filter
+                    name="filter_cancelled"
+                    string="Cancelled"
+                    domain="[('state', '=', 'cancel')]"
+                />
+                <separator />
+                <filter
+                    name="filter_this_month"
+                    string="This Month"
+                    domain="[
+                        ('date', '&gt;=', context_today().strftime('%Y-%m-01')),
+                        ('date', '&lt;', (context_today() + relativedelta(months=1)).strftime('%Y-%m-01')),
+                    ]"
+                />
                 <!-- Group By -->
                 <group>
                     <filter
                         name="group_by_journal"
                         string="Journal"
                         context="{'group_by': 'journal_id'}"
+                    />
+                    <filter
+                        name="group_by_partner"
+                        string="Partner"
+                        context="{'group_by': 'partner_id'}"
                     />
                     <filter
                         name="group_by_state"
@@ -240,6 +259,11 @@
                         name="group_by_journal"
                         string="Journal"
                         context="{'group_by': 'journal_id'}"
+                    />
+                    <filter
+                        name="group_by_partner"
+                        string="Partner"
+                        context="{'group_by': 'partner_id'}"
                     />
                     <filter
                         name="group_by_date"
