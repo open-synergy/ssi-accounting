@@ -20,4 +20,5 @@ from . import test_tax
 from . import test_tax_computation
 from . import test_tax_group
 from . import test_tax_sync
+from . import test_ui_journal_entry
 from . import test_view_smoke

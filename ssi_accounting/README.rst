@@ -373,6 +373,20 @@ Design decisions
   cascade ``reconcile_partial.unlink()`` already uses for a plain reconciliation.
 
 
+Work Instruction
+================
+
+Journal Entry
+-------------
+
+* `Create Journal Entry <docs/journal_entry/01-create.md>`_
+* `Edit Journal Entry <docs/journal_entry/02-edit.md>`_
+* `Delete Journal Entry <docs/journal_entry/03-delete.md>`_
+* `Post Journal Entry <docs/journal_entry/04-post.md>`_
+* `Unpost Journal Entry <docs/journal_entry/05-unpost.md>`_
+* `Cancel Journal Entry <docs/journal_entry/10-cancel.md>`_
+
+
 Installation
 ============
 

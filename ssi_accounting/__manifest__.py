@@ -17,6 +17,7 @@
         "mail",
         "product",
         "ssi_master_data_mixin",
+        "web_tour",
     ],
     "data": [
         "security/ssi_accounting_security.xml",
@@ -40,4 +41,9 @@
         "views/tax_group_views.xml",
         "views/tax_views.xml",
     ],
+    "assets": {
+        "web.assets_tests": [
+            "ssi_accounting/static/tests/tours/journal_entry_tour.esm.js",
+        ],
+    },
 }
