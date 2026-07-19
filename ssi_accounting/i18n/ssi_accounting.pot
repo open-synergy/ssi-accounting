@@ -215,6 +215,19 @@ msgstr ""
 
 #. module: ssi_accounting
 #. odoo-python
+#: code:addons/ssi_accounting/models/tax_repartition_line.py:0
+msgid ""
+"\n"
+"Context: Save tax repartition line\n"
+"Database ID: %(database_id)s\n"
+"Problem: The total factor of the %(group)s repartition lines is\n"
+"    %(total)s%%, it must be exactly 100%%\n"
+"Solution: Adjust the factor of each %(group)s repartition line so their\n"
+"    total equals 100%%\n"
+msgstr ""
+
+#. module: ssi_accounting
+#. odoo-python
 #: code:addons/ssi_accounting/models/account.py:0
 msgid ""
 "\n"
@@ -288,6 +301,7 @@ msgstr ""
 #. module: ssi_accounting
 #. odoo-python
 #: code:addons/ssi_accounting/models/journal.py:0
+#: code:addons/ssi_accounting/models/tax.py:0
 msgid "%(name)s (copy)"
 msgstr ""
 
@@ -295,6 +309,15 @@ msgstr ""
 #. odoo-python
 #: code:addons/ssi_accounting/models/mixin_sequence_number.py:0
 msgid "%s is not a stored field"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__amount_type
+msgid ""
+"'Group of Taxes': this tax is a set of sub taxes. 'Fixed': the tax amount "
+"stays the same whatever the price. 'Percentage': the tax amount is a "
+"percentage of the price. 'Percentage Tax Included': the tax amount is a "
+"division of the price."
 msgstr ""
 
 #. module: ssi_accounting
@@ -310,6 +333,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model,name:ssi_accounting.model_account_account
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_code_mapping__account_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__account_id
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_form
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_view_search
 msgid "Account"
@@ -385,6 +409,13 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__account_id
+msgid ""
+"Account on which to post the tax amount for this repartition line. Left "
+"empty on 'Base' repartition lines."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_code_mapping__account_id
 msgid "Account this code mapping row belongs to."
 msgstr ""
@@ -441,6 +472,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_needaction
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_needaction
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_needaction
 msgid "Action Needed"
 msgstr ""
 
@@ -448,30 +480,35 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__active
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__active
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__active
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__active
 msgid "Active"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_ids
 msgid "Activities"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_exception_decoration
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_exception_decoration
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_exception_decoration
 msgid "Activity Exception Decoration"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_state
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_state
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_state
 msgid "Activity State"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_type_icon
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_type_icon
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_type_icon
 msgid "Activity Type Icon"
 msgstr ""
 
@@ -481,8 +518,23 @@ msgid "Add a new account"
 msgstr ""
 
 #. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_form
+msgid "Advanced Options"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__include_base_amount
+msgid "Affect Base of Subsequent Taxes"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__reconcile
 msgid "Allow Reconciliation"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__amount
+msgid "Amount"
 msgstr ""
 
 #. module: ssi_accounting
@@ -545,6 +597,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_attachment_count
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_attachment_count
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_attachment_count
 msgid "Attachment Count"
 msgstr ""
 
@@ -561,6 +614,34 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__asset_cash
 msgid "Bank and Cash"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax_repartition_line__document_type__base
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax_repartition_line__repartition_type__base
+msgid "Base"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__is_base_affected
+msgid "Base Affected by Previous Taxes"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_form
+msgid "Base Distribution"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__repartition_type
+msgid ""
+"Base on which the factor is applied: the untaxed amount ('Base'), or the "
+"computed tax amount ('Tax')."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__repartition_type
+msgid "Based On"
 msgstr ""
 
 #. module: ssi_accounting
@@ -583,6 +664,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__reconcile
 msgid "Check this box if this account allows matching of journal items."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__children_tax_ids
+msgid "Children Taxes"
 msgstr ""
 
 #. module: ssi_accounting
@@ -643,9 +729,14 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__company_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__company_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__company_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__company_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__company_id
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_group_view_search
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_group_view_search
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_view_search
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_group_view_search
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
 msgid "Company"
 msgstr ""
 
@@ -667,13 +758,28 @@ msgid "Company that owns this journal group."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_group__company_id
+msgid "Company that owns this tax group."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__company_id
 msgid "Company this journal belongs to."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__company_id
+msgid "Company this repartition line belongs to, inherited from its tax."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_code_mapping__company_id
 msgid "Company this row's code applies to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__company_id
+msgid "Company this tax belongs to."
 msgstr ""
 
 #. module: ssi_accounting
@@ -688,7 +794,14 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__country_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__country_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__country_id
 msgid "Country"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__country_code
+msgid "Country Code"
 msgstr ""
 
 #. module: ssi_accounting
@@ -697,11 +810,24 @@ msgid "Country for which this tag is available, when applied on taxes."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_group__country_id
+msgid "Country this tax group applies to, if relevant for reporting."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__country_id
+msgid "Country this tax is applicable for."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__create_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__create_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__create_uid
 msgid "Created by"
 msgstr ""
@@ -712,6 +838,9 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__create_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__create_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__create_date
 msgid "Created on"
 msgstr ""
@@ -788,6 +917,7 @@ msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__account_price_include
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__company_price_include
 msgid "Default Sales Price Include"
 msgstr ""
 
@@ -809,6 +939,11 @@ msgid "Depreciation"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__description
+msgid "Description"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__display_mapping_tab
 msgid "Display Mapping Tab"
 msgstr ""
@@ -824,6 +959,9 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_currency__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__display_name
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__display_name
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__display_name
 msgid "Display Name"
 msgstr ""
@@ -831,6 +969,26 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__placeholder_code
 msgid "Display code"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__repartition_line_ids
+msgid "Distribution"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__repartition_line_base_ids
+msgid "Distribution for Base"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__repartition_line_reverse_ids
+msgid "Distribution for Reverse"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__document_type
+msgid "Document Type"
 msgstr ""
 
 #. module: ssi_accounting
@@ -874,6 +1032,25 @@ msgid "Expenses"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__factor
+msgid "Factor Ratio"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__factor
+msgid ""
+"Factor to apply on the journal entry lines generated from this repartition "
+"line, as a ratio (factor_percent / 100)."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__factor_percent
+msgid ""
+"Factor to apply on the journal entry lines generated from this repartition "
+"line, in percent."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__res_company__fiscalyear_last_month__2
 msgid "February"
 msgstr ""
@@ -905,6 +1082,11 @@ msgid "Fiscal Year Last Month"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__amount_type__fixed
+msgid "Fixed"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__asset_fixed
 msgid "Fixed Assets"
 msgstr ""
@@ -912,18 +1094,21 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_follower_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_follower_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_follower_ids
 msgid "Followers"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_partner_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_partner_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_partner_ids
 msgid "Followers (Partners)"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_type_icon
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_type_icon
+#: model:ir.model.fields,help:ssi_accounting.field_tax__activity_type_icon
 msgid "Font awesome icon e.g. fa-tasks"
 msgstr ""
 
@@ -939,6 +1124,11 @@ msgstr ""
 msgid ""
 "Forces all journal items in this account to have a specific currency. If no "
 "currency is set, entries can use any currency."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__description
+msgid "Free-form description of this tax, e.g. printed on documents."
 msgstr ""
 
 #. module: ssi_accounting
@@ -967,6 +1157,11 @@ msgid "Group"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__amount_type__group
+msgid "Group of Taxes"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__journal_group_ids
 msgid "Groups this journal belongs to, used to filter the journal list."
 msgstr ""
@@ -974,7 +1169,27 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__has_message
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__has_message
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__has_message
 msgid "Has Message"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__has_negative_factor
+msgid "Has Negative Factor"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__repartition_line_reverse_ids
+msgid ""
+"How this tax's amount is split across accounts when the journal entry it was"
+" used on is reversed."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__repartition_line_base_ids
+msgid ""
+"How this tax's amount is split across accounts when the tax is used "
+"normally."
 msgstr ""
 
 #. module: ssi_accounting
@@ -988,6 +1203,9 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_mixin_sequence_number__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_currency__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__id
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__id
 msgid "ID"
 msgstr ""
@@ -995,25 +1213,51 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_exception_icon
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_exception_icon
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_exception_icon
 msgid "Icon"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_exception_icon
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_exception_icon
+#: model:ir.model.fields,help:ssi_accounting.field_tax__activity_exception_icon
 msgid "Icon to indicate an exception activity."
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_needaction
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_needaction
+#: model:ir.model.fields,help:ssi_accounting.field_tax__message_needaction
 msgid "If checked, new messages require your attention."
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_has_error
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_has_error
+#: model:ir.model.fields,help:ssi_accounting.field_tax__message_has_error
 msgid "If checked, some messages have a delivery error."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__include_base_amount
+msgid ""
+"If set, taxes with a higher sequence than this one will be affected by it, "
+"provided they accept it."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__is_base_affected
+msgid ""
+"If set, taxes with a lower sequence might affect this one's base, provided "
+"they try to do it."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_group__preceding_subtotal
+msgid ""
+"If set, used as the label of a subtotal excluding this tax group, shown on "
+"documents before this group's taxes. If left empty, the tax group is shown "
+"after the 'Untaxed amount' subtotal."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1024,6 +1268,16 @@ msgstr ""
 #. module: ssi_accounting
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.journal_view_search
 msgid "Inactive Journals"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
+msgid "Inactive Taxes"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__price_include_override
+msgid "Included in Price"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1054,6 +1308,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_is_follower
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_is_follower
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_is_follower
 msgid "Is Follower"
 msgstr ""
 
@@ -1126,6 +1381,11 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__label
+msgid "Label"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_group__name
 msgid "Label of the account group, shown together with its code prefix range."
 msgstr ""
@@ -1155,11 +1415,26 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_group__name
+msgid ""
+"Label of the tax group, shown on the tax configuration form and wherever "
+"taxes are grouped for reporting."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__name
+msgid "Label of the tax, shown wherever a tax can be selected."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_group__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__write_uid
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__write_uid
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__write_uid
 msgid "Last Updated by"
 msgstr ""
@@ -1170,6 +1445,9 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_tag__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__write_date
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__write_date
 #: model:ir.model.fields,field_description:ssi_accounting.field_test_mixin_sequence_number__write_date
 msgid "Last Updated on"
 msgstr ""
@@ -1225,12 +1503,14 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_has_error
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_has_error
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_has_error
 msgid "Message Delivery error"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_ids
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_ids
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_ids
 msgid "Messages"
 msgstr ""
 
@@ -1254,6 +1534,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__my_activity_date_deadline
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__my_activity_date_deadline
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__my_activity_date_deadline
 msgid "My Activity Deadline"
 msgstr ""
 
@@ -1262,24 +1543,28 @@ msgstr ""
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__name
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_root__name
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__name
 msgid "Name"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_date_deadline
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_date_deadline
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_date_deadline
 msgid "Next Activity Deadline"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_summary
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_summary
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_summary
 msgid "Next Activity Summary"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_type_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_type_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_type_id
 msgid "Next Activity Type"
 msgstr ""
 
@@ -1291,6 +1576,11 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__liability_non_current
 msgid "Non-current Liabilities"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__type_tax_use__none
+msgid "None"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1306,12 +1596,14 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_needaction_counter
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_needaction_counter
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_needaction_counter
 msgid "Number of Actions"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__message_has_error_counter
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__message_has_error_counter
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__message_has_error_counter
 msgid "Number of errors"
 msgstr ""
 
@@ -1325,12 +1617,14 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_needaction_counter
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_needaction_counter
+#: model:ir.model.fields,help:ssi_accounting.field_tax__message_needaction_counter
 msgid "Number of messages requiring action"
 msgstr ""
 
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__message_has_error_counter
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__message_has_error_counter
+#: model:ir.model.fields,help:ssi_accounting.field_tax__message_has_error_counter
 msgid "Number of messages with delivery error"
 msgstr ""
 
@@ -1360,8 +1654,21 @@ msgid "Opening/Closing"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__tag_ids
+msgid "Optional grid tags used for tax reporting."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__tag_ids
 msgid "Optional tags you may want to assign for custom reporting."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__sequence
+msgid ""
+"Order in which repartition lines are displayed and matched. For reversal to "
+"work correctly, 'Base' and 'Reverse' repartition lines should be arranged in"
+" the same order."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1372,6 +1679,13 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__income_other
 msgid "Other Income"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__price_include_override
+msgid ""
+"Overrides the company's default on whether the price already includes this "
+"tax. Leave empty to follow the company default."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1398,13 +1712,39 @@ msgid "Per-company view of this account's code, used by the Mapping tab."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__amount_type__percent
+msgid "Percentage"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__amount_type__division
+msgid "Percentage Tax Included"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__current_balance
 msgid "Posted balance of this account in the active company."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__preceding_subtotal
+msgid "Preceding Subtotal"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_account__account_type__asset_prepayments
 msgid "Prepayments"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__price_include
+msgid "Price Include"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__type_tax_use__purchase
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
+msgid "Purchases"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1421,7 +1761,18 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_account__activity_user_id
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__activity_user_id
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__activity_user_id
 msgid "Responsible User"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax_repartition_line__document_type__reverse
+msgid "Reverse"
+msgstr ""
+
+#. module: ssi_accounting
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_form
+msgid "Reverse Distribution"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1458,6 +1809,12 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__type_tax_use__sale
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
+msgid "Sales"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__res_company__fiscalyear_last_month__9
 msgid "September"
 msgstr ""
@@ -1465,6 +1822,9 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__sequence
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal_group__sequence
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__sequence
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__sequence
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__sequence
 msgid "Sequence"
 msgstr ""
 
@@ -1501,8 +1861,20 @@ msgid "Set active to false to hide the journal without removing it."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__active
+msgid "Set active to false to hide the tax without removing it."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__code
 msgid "Short Code"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__label
+msgid ""
+"Short label shown for this tax on documents, e.g. 'VAT 11%'. Defaults to the"
+" tax name when left empty."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1530,6 +1902,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_state
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_state
+#: model:ir.model.fields,help:ssi_accounting.field_tax__activity_state
 msgid ""
 "Status based on activities\n"
 "Overdue: Due date is already passed\n"
@@ -1538,8 +1911,20 @@ msgid ""
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__children_tax_ids
+msgid ""
+"Sub taxes aggregated by this tax. Only used when 'amount_type' is 'Group of "
+"Taxes'."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_account_journal__suspense_account_id
 msgid "Suspense Account"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__tag_ids_domain
+msgid "Tag Ids Domain"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1553,18 +1938,70 @@ msgid "Tags"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_tax
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__tax_id
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax_repartition_line__repartition_type__tax
+msgid "Tax"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,field_description:ssi_accounting.field_res_company__tax_calculation_rounding_method
 msgid "Tax Calculation Rounding Method"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__amount_type
+msgid "Tax Computation"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__res_company__account_price_include__tax_excluded
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__price_include_override__tax_excluded
 msgid "Tax Excluded"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_repartition_line__tag_ids
+msgid "Tax Grids"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_tax_group
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__tax_group_id
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
+msgid "Tax Group"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.actions.act_window,name:ssi_accounting.tax_group_action
+#: model:ir.ui.menu,name:ssi_accounting.tax_group_menu
+msgid "Tax Groups"
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__res_company__account_price_include__tax_included
+#: model:ir.model.fields.selection,name:ssi_accounting.selection__tax__price_include_override__tax_included
 msgid "Tax Included"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__name
+msgid "Tax Name"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__tax_payable_account_id
+msgid "Tax Payable Account"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax_group__tax_receivable_account_id
+msgid "Tax Receivable Account"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model,name:ssi_accounting.model_tax_repartition_line
+msgid "Tax Repartition Line"
 msgstr ""
 
 #. module: ssi_accounting
@@ -1573,9 +2010,53 @@ msgid "Tax Return Lock Date"
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__type_tax_use
+#: model_terms:ir.ui.view,arch_db:ssi_accounting.tax_view_search
+msgid "Tax Type"
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_group__tax_receivable_account_id
+msgid ""
+"Tax current account used as a counterpart to the Tax Closing Entry when in "
+"favor of the company."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_group__tax_payable_account_id
+msgid ""
+"Tax current account used as a counterpart to the Tax Closing Entry when in "
+"favor of the tax authorities."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__tax_group_id
+msgid ""
+"Tax group this tax belongs to, mainly used to derive its payable/receivable "
+"accounts."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__amount
+msgid "Tax rate or fixed amount, interpreted according to 'amount_type'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__tax_id
+msgid "Tax this repartition line belongs to."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,field_description:ssi_accounting.field_tax__is_used
+msgid "Tax used"
+msgstr ""
+
+#. module: ssi_accounting
 #. odoo-python
 #: code:addons/ssi_accounting/models/account.py:0
+#: model:ir.actions.act_window,name:ssi_accounting.tax_action
 #: model:ir.model.fields.selection,name:ssi_accounting.selection__account_tag__applicability__taxes
+#: model:ir.ui.menu,name:ssi_accounting.tax_menu
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.account_tag_view_search
 #: model_terms:ir.ui.view,arch_db:ssi_accounting.view_company_form_inherit_ssi_accounting
 msgid "Taxes"
@@ -1587,6 +2068,38 @@ msgid ""
 "Technical field read by 'mixin.sequence_number' (once a concrete numbered "
 "document is wired to a journal) to enforce a custom sequence composition the"
 " mixin would otherwise misinterpret."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__tag_ids_domain
+msgid ""
+"Technical field: dynamic domain applied to 'tag_ids', restricted to the "
+"tax's own country (or no country)."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__repartition_line_ids
+msgid ""
+"Technical field: every repartition line of this tax, base and reverse "
+"combined."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__company_price_include
+msgid ""
+"Technical field: the company's default on whether prices include taxes."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_group__country_code
+msgid "Technical field: two-letter code of 'country_id'."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__has_negative_factor
+msgid ""
+"Technical field: whether at least one 'Tax' repartition line of the base "
+"distribution has a negative factor."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1629,6 +2142,7 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__activity_exception_decoration
 #: model:ir.model.fields,help:ssi_accounting.field_account_journal__activity_exception_decoration
+#: model:ir.model.fields,help:ssi_accounting.field_tax__activity_exception_decoration
 msgid "Type of the exception activity on record."
 msgstr ""
 
@@ -1655,6 +2169,16 @@ msgid "Used to order journals in lists."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_group__sequence
+msgid "Used to order tax groups in lists."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__sequence
+msgid "Used to order taxes when several are applied together."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:res.groups,name:ssi_accounting.group_accounting_user
 msgid "User"
 msgstr ""
@@ -1665,10 +2189,23 @@ msgid "Where this tag can be applied: on accounts, or on tax grid lines."
 msgstr ""
 
 #. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__type_tax_use
+msgid ""
+"Where this tax is selectable. 'None' means the tax cannot be used by itself,"
+" but can still be used inside a group."
+msgstr ""
+
+#. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__include_initial_balance
 msgid ""
 "Whether reports should consider journal items from the beginning of time "
 "instead of from the fiscal year only."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__price_include
+msgid ""
+"Whether the price used wherever this tax applies already includes this tax."
 msgstr ""
 
 #. module: ssi_accounting
@@ -1681,6 +2218,20 @@ msgstr ""
 #. module: ssi_accounting
 #: model:ir.model.fields,help:ssi_accounting.field_account_account__used
 msgid "Whether this account already has journal items posted on it."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax_repartition_line__document_type
+msgid ""
+"Whether this line applies when the tax is used normally ('Base'), or when "
+"the journal entry it was used on is reversed ('Reverse')."
+msgstr ""
+
+#. module: ssi_accounting
+#: model:ir.model.fields,help:ssi_accounting.field_tax__is_used
+msgid ""
+"Whether this tax is already used on at least one journal item. Always false "
+"while journal items do not exist yet."
 msgstr ""
 
 #. module: ssi_accounting
