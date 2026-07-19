@@ -2,10 +2,15 @@
 # Copyright 2026 PT. Simetri Sinergi Indonesia
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
+import calendar
 from contextlib import contextmanager
+from datetime import date, timedelta
+
+from dateutil.relativedelta import relativedelta
 
 from odoo import Command, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
+from odoo.tools import date_utils
 
 
 class JournalEntry(models.Model):
@@ -41,10 +46,37 @@ class JournalEntry(models.Model):
     branches, once the tax synchronisation unit lands** -- see the issue's
     Keputusan Desain.
 
-    **Posting/numbering/state machine are a separate, later unit.** This
-    unit keeps every entry in ``draft`` (no ``action_post``/
-    ``button_draft``/``button_cancel``) and ``name`` is filled in manually,
-    defaulting to ``'/'``.
+    **Posting/numbering/state machine land in this issue.**
+    ``journal_entry`` inherits ``mixin.sequence_number``
+    (``_sequence_field = "name"``, ``_sequence_date_field = "date"``,
+    ``_sequence_index = "journal_id"`` -- numbering resets per journal,
+    not globally, see ``models/mixin_sequence_number.py``). ``name`` is
+    assigned only on posting: ``_compute_name`` only calls
+    ``_set_next_sequence()`` once ``state != "draft"``, so a draft entry
+    stays empty (``name_placeholder`` previews what it will get).
+    ``action_post``/``_post`` keep the checks upstream's own ``_post``
+    performs on state/lines/journal/currency/account archival and
+    cross-company accounts, plus the two lock dates this repo exposes
+    (``fiscalyear_lock_date``/``tax_lock_date`` -- see
+    ``res_company.py``); a locked date is pushed forward rather than
+    rejected, exactly like upstream. ``soft``/``auto_post`` and the
+    whole recurring-entry chain are gone entirely, so **a future-dated
+    entry posts immediately instead of being queued** -- unlike
+    upstream Odoo, see the README. The access check upstream performs
+    against ``account.group_account_invoice`` becomes
+    ``ssi_accounting.group_accounting_user`` here. ``button_draft``
+    keeps the posted/cancelled-only guard and a reconciliation guard
+    (``has_reconciled_entries``, forward-declared the same defensive
+    way as ``account.py``'s ``_toggle_reconcile_to_true`` -- always
+    ``False`` until a later reconciliation unit adds the fields it
+    reads); ``name`` is deliberately **not** cleared by it, and
+    ``posted_before`` stays ``True``. ``button_cancel`` writes straight
+    to ``cancel`` from either ``draft`` or ``posted`` (tracked
+    automatically via ``state``'s own ``tracking=True``). The
+    exchange-difference posting cascade upstream's ``_post`` triggers
+    on ``to_post`` is out of scope here -- a later multi-currency
+    unit's job -- so ``made_sequence_gap`` is declared but not
+    maintained by any cascade in this unit.
 
     **``_check_balanced``/``_get_unbalanced_moves`` are ported verbatim**
     (including their raw SQL), with only the table names adapted
@@ -63,18 +95,49 @@ class JournalEntry(models.Model):
 
     _name = "journal_entry"
     _description = "Journal Entry"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "mixin.sequence_number"]
     _order = "date desc, name desc, id desc"
     _check_company_auto = True
 
+    _sequence_field = "name"
+    _sequence_date_field = "date"
+    _sequence_index = "journal_id"
+
+    _unique_name = models.UniqueIndex(
+        "(name, journal_id) WHERE (state = 'posted' AND name != '/')",
+        "Another entry with the same name already exists.",
+    )
+
     name = fields.Char(
-        default="/",
+        compute="_compute_name",
+        inverse="_inverse_name",
+        readonly=False,
+        store=True,
         copy=False,
         index="trigram",
         tracking=True,
-        help="Reference/number of this journal entry. Stays '/' until a "
-        "later unit adds automatic numbering -- fill it in manually "
-        "until then.",
+        help="Statutory number of this journal entry, assigned "
+        "automatically on posting -- gapless per journal, resetting "
+        "yearly (see 'mixin.sequence_number'). Stays empty while "
+        "'draft'; 'name_placeholder' previews the number it will get.",
+    )
+    name_placeholder = fields.Char(
+        compute="_compute_name_placeholder",
+        help="Preview of the number this entry will get once posted, "
+        "shown in the form while 'name' itself is still empty.",
+    )
+    highest_name = fields.Char(
+        compute="_compute_highest_name",
+        help="Technical field: the last sequence number issued so far "
+        "in this entry's journal, used to compute 'name_placeholder' "
+        "and to adjust the accounting date on posting.",
+    )
+    made_sequence_gap = fields.Boolean(
+        copy=False,
+        help="Technical field: whether this entry breaks the "
+        "numbering chain of its journal. Declared for forward "
+        "compatibility but not maintained by any cascade in this unit "
+        "-- see the class docstring.",
     )
     ref = fields.Char(
         string="Reference",
@@ -99,8 +162,9 @@ class JournalEntry(models.Model):
         copy=False,
         default="draft",
         tracking=True,
-        help="Status of this journal entry. Posting/cancelling is added "
-        "by a later unit -- every entry stays 'draft' for now.",
+        help="Status of this journal entry: 'draft' can still be "
+        "edited freely, 'posted' is final and numbered, 'cancel' is "
+        "void.",
     )
     journal_id = fields.Many2one(
         comodel_name="account.journal",
@@ -154,8 +218,19 @@ class JournalEntry(models.Model):
     )
     posted_before = fields.Boolean(
         copy=False,
-        help="Technical field: whether this journal entry has ever been "
-        "posted. Always false until posting is added by a later unit.",
+        help="Technical field: whether this journal entry has ever "
+        "been posted. Stays true after a 'button_draft' reset.",
+    )
+    show_reset_to_draft_button = fields.Boolean(
+        compute="_compute_show_reset_to_draft_button",
+        help="Technical field: whether the 'Reset to Draft' button "
+        "should be shown -- true for posted or cancelled entries.",
+    )
+    has_reconciled_entries = fields.Boolean(
+        compute="_compute_has_reconciled_entries",
+        help="Technical field: whether this entry has reconciled "
+        "journal items, used to guard 'button_draft'. Always false "
+        "until a later reconciliation unit adds the fields it reads.",
     )
     suitable_journal_ids = fields.Many2many(
         comodel_name="account.journal",
@@ -227,6 +302,445 @@ class JournalEntry(models.Model):
         for move in self:
             move.amount_total_debit = sum(move.line_ids.mapped("debit"))
             move.amount_total_credit = sum(move.line_ids.mapped("credit"))
+
+    # ======================================================================
+    # SEQUENCE MIXIN
+    # ======================================================================
+
+    @property
+    def _sequence_monthly_regex(self):
+        # EXTENDS mixin.sequence_number
+        return (
+            self.journal_id.sequence_override_regex or super()._sequence_monthly_regex
+        )
+
+    @property
+    def _sequence_yearly_regex(self):
+        # EXTENDS mixin.sequence_number
+        return self.journal_id.sequence_override_regex or super()._sequence_yearly_regex
+
+    @property
+    def _sequence_year_range_regex(self):
+        # EXTENDS mixin.sequence_number
+        return (
+            self.journal_id.sequence_override_regex
+            or super()._sequence_year_range_regex
+        )
+
+    @property
+    def _sequence_fixed_regex(self):
+        # EXTENDS mixin.sequence_number
+        return self.journal_id.sequence_override_regex or super()._sequence_fixed_regex
+
+    @property
+    def _sequence_year_range_monthly_regex(self):
+        # EXTENDS mixin.sequence_number
+        return (
+            self.journal_id.sequence_override_regex
+            or super()._sequence_year_range_monthly_regex
+        )
+
+    def _must_check_constrains_date_sequence(self):
+        # OVERRIDES mixin.sequence_number: only a posted entry's 'name'
+        # must line up with its 'date' -- a draft kept its old number
+        # after a 'button_draft' reset and may still have its date
+        # edited before being posted again.
+        return self.state == "posted"
+
+    def _get_last_sequence_domain(self, relaxed=False):
+        # EXTENDS mixin.sequence_number: scope the search for the
+        # previous entry number to this entry's own journal (matching
+        # '_sequence_index'), and to the date range implied by the
+        # reset periodicity of the closest reference entry. Adapted
+        # (behaviour-wise, simplified: no move_type/refund/payment/
+        # self-billing concepts, none of which exist in this repo)
+        # from upstream ``account.move._get_last_sequence_domain``.
+        self.ensure_one()
+        if not self.date or not self.journal_id:
+            return "WHERE FALSE", {}
+        where_string = "WHERE journal_id = %(journal_id)s AND name != '/'"
+        param = {"journal_id": self.journal_id.id}
+        if not relaxed:
+            domain = [
+                ("journal_id", "=", self.journal_id.id),
+                ("id", "!=", self.id or self._origin.id),
+                ("name", "not in", ("/", "", False)),
+            ]
+            reference_name = (
+                self.sudo()
+                .search(
+                    domain + [("date", "<=", self.date)],
+                    order="date desc",
+                    limit=1,
+                )
+                .name
+            )
+            if not reference_name:
+                reference_name = (
+                    self.sudo().search(domain, order="date asc", limit=1).name
+                )
+            sequence_number_reset = self._deduce_sequence_number_reset(reference_name)
+            date_start, date_end, *_unused = self._get_sequence_date_range(
+                sequence_number_reset
+            )
+            where_string += " AND date BETWEEN %(date_start)s AND %(date_end)s"
+            param["date_start"] = date_start
+            param["date_end"] = date_end
+
+            # Exclude sequence formats the regex would otherwise also
+            # catch (e.g. a monthly-formatted number when we are
+            # actually scanning for a yearly one) -- see upstream's own
+            # comment on ``account.move._get_last_sequence_domain``.
+            if sequence_number_reset in ("year", "year_range"):
+                param["anti_regex"] = (
+                    self._make_regex_non_capturing(
+                        self._sequence_monthly_regex.split("(?P<seq>")[0]
+                    )
+                    + "$"
+                )
+            elif sequence_number_reset == "never":
+                param["anti_regex"] = (
+                    self._make_regex_non_capturing(
+                        self._sequence_yearly_regex.split("(?P<seq>")[0]
+                    )
+                    + "$"
+                )
+            if param.get("anti_regex") and not self.journal_id.sequence_override_regex:
+                where_string += " AND sequence_prefix !~ %(anti_regex)s "
+        return where_string, param
+
+    def _get_starting_sequence(self):
+        # EXTENDS mixin.sequence_number: '<journal code>/<year>/00000',
+        # resetting yearly -- upstream's own equivalent of its "annual"
+        # branch (sale/bank/cash/credit journal types), applied to
+        # every journal here since this repo's 'account.journal.type'
+        # has no such split (see 'journal.py'). Staggered fiscal years
+        # (company 'fiscalyear_last_day'/'fiscalyear_last_month' not
+        # 31 Dec) shrink the running number to 4 digits and the year
+        # segment to a "YY-YY" range, exactly like upstream.
+        self.ensure_one()
+        entry_date = self.date or fields.Date.context_today(self)
+        year_part = f"{entry_date.year:04d}"
+        last_day = int(self.company_id.fiscalyear_last_day)
+        last_month = int(self.company_id.fiscalyear_last_month)
+        is_staggered_year = last_month != 12 or last_day != 31
+        if is_staggered_year:
+            max_last_day = calendar.monthrange(entry_date.year, last_month)[1]
+            last_day = min(last_day, max_last_day)
+            if entry_date > date(entry_date.year, last_month, last_day):
+                year_part = f"{entry_date:%y}-{entry_date + relativedelta(years=1):%y}"
+            else:
+                year_part = f"{entry_date + relativedelta(years=-1):%y}-{entry_date:%y}"
+        seq_placeholder = "0000" if is_staggered_year else "00000"
+        return f"{self.journal_id.code}/{year_part}/{seq_placeholder}"
+
+    def _affect_tax_report(self):
+        self.ensure_one()
+        return any(line._affect_tax_report() for line in self.line_ids)
+
+    def _get_violated_lock_dates(self, entry_date, has_tax):
+        self.ensure_one()
+        return self.company_id._get_lock_date_violations(entry_date, tax=has_tax)
+
+    def _get_accounting_date(self, entry_date, has_tax, lock_dates=None):
+        # Adapted (behaviour-wise, simplified: no invoice/sale-document
+        # concepts) from upstream ``account.move._get_accounting_date``.
+        self.ensure_one()
+        lock_dates = lock_dates or self._get_violated_lock_dates(entry_date, has_tax)
+        today = fields.Date.context_today(self)
+        highest_name = self.highest_name or self._get_last_sequence(relaxed=True)
+        number_reset = self._deduce_sequence_number_reset(highest_name)
+        if lock_dates:
+            entry_date = lock_dates[-1][0] + timedelta(days=1)
+        if not highest_name or number_reset in ("month", "year_range_month"):
+            if (today.year, today.month) > (entry_date.year, entry_date.month):
+                return date_utils.get_month(entry_date)[1]
+            return max(entry_date, today)
+        if number_reset == "year":
+            if today.year > entry_date.year:
+                return date(entry_date.year, 12, 31)
+            return max(entry_date, today)
+        return entry_date
+
+    @api.depends("posted_before", "state", "journal_id", "date")
+    def _compute_name(self):
+        # EXTENDS mixin.sequence_number: assign the number only once
+        # posted -- see the class docstring. Ported (behaviour-wise)
+        # verbatim from upstream ``AccountMove._compute_name``: a
+        # record whose branch does not reassign 'name' here keeps its
+        # existing value. That is only actually safe for callers that
+        # write 'state' without 'name' already carrying a real number
+        # -- 'button_draft'/'button_cancel'/re-posting all go through
+        # '_write_state' instead of a plain 'write({"state": ...})' for
+        # that exact reason; see its docstring.
+        self = self.sorted(lambda move: (move.date, move._origin.id))
+        for move in self:
+            if move.state == "cancel":
+                continue
+            move_has_name = move.name and move.name != "/"
+            if not move.posted_before and not move._sequence_matches_date():
+                move.name = False
+                continue
+            if move.date and not move_has_name and move.state != "draft":
+                move._set_next_sequence()
+        self._inverse_name()
+
+    def _inverse_name(self):
+        """No-op inverse, only present so 'name' stays directly writable.
+
+        Upstream's own inverse additionally triggers
+        ``_update_sequence_made_gap()`` -- out of scope here, see
+        'made_sequence_gap' field's own help text and the class docstring.
+        """
+
+    @api.depends(
+        "date",
+        "journal_id",
+        "name",
+        "posted_before",
+        "sequence_number",
+        "sequence_prefix",
+        "state",
+    )
+    def _compute_name_placeholder(self):
+        for move in self:
+            if (
+                (not move.name or move.name == "/")
+                and move.date
+                and not move._get_last_sequence()
+            ):
+                (
+                    sequence_format_string,
+                    sequence_format_values,
+                ) = move._get_next_sequence_format()
+                sequence_format_values["seq"] += 1
+                move.name_placeholder = sequence_format_string.format(
+                    **sequence_format_values
+                )
+            else:
+                move.name_placeholder = False
+
+    @api.depends("journal_id", "date")
+    def _compute_highest_name(self):
+        for move in self:
+            move.highest_name = move._get_last_sequence()
+
+    @api.depends("state")
+    def _compute_show_reset_to_draft_button(self):
+        for move in self:
+            move.show_reset_to_draft_button = move.state in ("posted", "cancel")
+
+    @api.depends("line_ids")
+    def _compute_has_reconciled_entries(self):
+        """Always false until a later reconciliation unit lands.
+
+        Guarded the same defensive way as ``account.py``'s
+        ``_toggle_reconcile_to_true``/``_toggle_reconcile_to_false``:
+        reads the field only if it exists, so this starts working the
+        moment a later unit adds 'reconciled' to
+        'journal_entry.item' -- no change needed here at that point.
+        """
+        if "reconciled" not in self.env["journal_entry.item"]._fields:
+            for move in self:
+                move.has_reconciled_entries = False
+            return
+        for move in self:
+            move.has_reconciled_entries = len(move.line_ids._reconciled_lines()) > 1
+
+    # ======================================================================
+    # STATE MACHINE
+    # ======================================================================
+
+    def action_post(self):
+        if self:
+            self._post()
+        return False
+
+    def _post(self):
+        """Post 'self': give each entry its statutory number and lock it in.
+
+        Trimmed (behaviour-wise) from Odoo core ``AccountMove._post`` --
+        see the class docstring for the itemised list of checks kept
+        and dropped, and the issue's Keputusan Desain for the full
+        rationale. ``soft``/``auto_post`` are gone entirely.
+        """
+        if not self.env.su and not self.env.user.has_group(
+            "ssi_accounting.group_accounting_user"
+        ):
+            raise AccessError(
+                self.env._("You don't have the access rights to post a journal entry.")
+            )
+
+        problems = []
+        for move in self:
+            if move.state in ("posted", "cancel"):
+                problems.append(
+                    self.env._(
+                        "%(name)s (id %(id)s) must be in draft",
+                        name=move.display_name,
+                        id=move.id,
+                    )
+                )
+            if not move.line_ids.filtered(
+                lambda line: line.display_type not in ("line_section", "line_note")
+            ):
+                problems.append(
+                    self.env._("%(name)s has no postable line", name=move.display_name)
+                )
+            if not move.journal_id.active:
+                problems.append(
+                    self.env._(
+                        "%(name)s posts to the archived journal %(journal)s",
+                        name=move.display_name,
+                        journal=move.journal_id.display_name,
+                    )
+                )
+            if move.currency_id and not move.currency_id.active:
+                problems.append(
+                    self.env._(
+                        "%(name)s uses the archived currency %(currency)s",
+                        name=move.display_name,
+                        currency=move.currency_id.name,
+                    )
+                )
+            archived_accounts = move.line_ids.account_id.filtered(
+                lambda account: not account.active
+            )
+            if archived_accounts:
+                problems.append(
+                    self.env._(
+                        "%(name)s uses the archived account(s) %(accounts)s",
+                        name=move.display_name,
+                        accounts=", ".join(archived_accounts.mapped("display_name")),
+                    )
+                )
+            parent_companies = move.company_id.sudo().parent_ids
+            mismatched_accounts = move.line_ids.mapped("account_id").filtered(
+                lambda account, parents=parent_companies: not (
+                    parents & account.sudo().company_ids
+                )
+            )
+            if mismatched_accounts:
+                problems.append(
+                    self.env._(
+                        "%(name)s uses account(s) from a different company: "
+                        "%(accounts)s",
+                        name=move.display_name,
+                        accounts=", ".join(mismatched_accounts.mapped("display_name")),
+                    )
+                )
+
+        if problems:
+            raise UserError(
+                self.env._(
+                    """
+Context: Post journal entry
+Problem: %(problems)s
+Solution: Fix the listed issue(s), then post again
+""",
+                    problems="\n".join(f"- {problem}" for problem in problems),
+                )
+            )
+
+        for move in self:
+            affects_tax_report = move._affect_tax_report()
+            lock_dates = move._get_violated_lock_dates(move.date, affects_tax_report)
+            if not lock_dates:
+                continue
+            new_date = move._get_accounting_date(
+                move.date, affects_tax_report, lock_dates=lock_dates
+            )
+            move.message_post(
+                body=self.env._(
+                    """
+Context: Post journal entry
+Database ID: %(database_id)s
+Problem: The date %(old_date)s falls within a locked period (%(lock_date_info)s)
+Solution: The entry is accounted on %(new_date)s instead
+""",
+                    database_id=move.id,
+                    old_date=move.date,
+                    lock_date_info=self.env["res.company"]._format_lock_dates(
+                        lock_dates
+                    ),
+                    new_date=new_date,
+                )
+            )
+            move.date = new_date
+
+        self._write_state("posted", extra_vals={"posted_before": True})
+        return self
+
+    def button_draft(self):
+        """Reset 'self' to draft.
+
+        Trimmed from Odoo core ``AccountMove.button_draft``: keeps the
+        posted/cancelled-only guard and the reconciliation guard (via
+        'has_reconciled_entries', see that field's own help text).
+        Drops the hash/secured guard (no hash chain here) and every
+        payment/bank-statement cascade (no such documents here).
+        'name' is deliberately left untouched -- see its own help text
+        and '_write_state'\'s docstring for how that is enforced.
+        """
+        if any(move.state not in ("cancel", "posted") for move in self):
+            raise UserError(
+                self.env._(
+                    "Only posted or cancelled journal entries can be reset to draft."
+                )
+            )
+        if any(move.has_reconciled_entries for move in self):
+            raise UserError(
+                self.env._(
+                    "You cannot reset to draft a journal entry that has "
+                    "reconciled entries."
+                )
+            )
+        self._write_state("draft")
+
+    def button_cancel(self):
+        """Cancel 'self', from either 'draft' or 'posted'.
+
+        Trimmed from Odoo core ``AccountMove.button_cancel``: writes
+        'state' straight to 'cancel' (tracked automatically via the
+        'state' field's own 'tracking=True' -- no separate
+        message_post needed). Drops 'need_cancel_request'/e-invoice
+        cancellation (neither exists here) and the
+        posted->draft->cancel cascade through 'button_draft' (its
+        guards do not apply to a plain cancel).
+        """
+        if any(move.state not in ("draft", "posted") for move in self):
+            raise UserError(
+                self.env._("Only draft or posted journal entries can be cancelled.")
+            )
+        self._write_state("cancel")
+
+    def _write_state(self, state, extra_vals=None):
+        """Write 'state' (plus 'extra_vals') without losing 'name'.
+
+        'name' depends on 'state' (see '_compute_name') purely so
+        posting can assign it -- once a move already carries a real
+        number, a *later* 'state' write (draft/cancel, or re-posting)
+        must never touch it again. Re-triggering '_compute_name' for a
+        record that already has a number is exactly that: harmless in
+        principle ('_compute_name' falls through to preserving it), but
+        Odoo's recompute-in-progress guard makes 'move.name' read back
+        empty while the field is being recomputed, even for a plain
+        self-referential re-assignment -- so leaving 'name' out of
+        `vals` here is not safe to rely on. Writing it back explicitly,
+        alongside 'state', in the *same* call protects it from ever
+        being marked "to compute" in the first place (Odoo never
+        recomputes a field whose value was just given directly).
+        Records with no number yet (a fresh 'draft' being posted for
+        the first time) are written in a separate, plain call instead,
+        so '_compute_name' still gets to run and number them.
+        """
+        vals = {"state": state, **(extra_vals or {})}
+        already_numbered = self.filtered(lambda move: move.name)
+        unnumbered = self - already_numbered
+        for move in already_numbered:
+            move.write({**vals, "name": move.name})
+        if unnumbered:
+            unnumbered.write(vals)
 
     def is_entry(self):
         """Shim: every journal entry in this repo is a plain entry.

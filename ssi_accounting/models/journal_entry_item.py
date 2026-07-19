@@ -559,6 +559,21 @@ class JournalEntryItem(models.Model):
         records._compute_amount_currency()
         return records
 
+    def _affect_tax_report(self):
+        """Whether this line carries a tax that affects the tax report.
+
+        Ported verbatim (behaviour-wise) from upstream
+        ``account.move.line._affect_tax_report``. Read by
+        ``journal_entry._affect_tax_report``/``_post`` to decide
+        whether ``tax_lock_date`` applies when posting.
+        """
+        self.ensure_one()
+        return bool(
+            self.tax_ids
+            or self.tax_line_id
+            or self.tax_tag_ids.filtered(lambda tag: tag.applicability == "taxes")
+        )
+
     @api.constrains("debit", "credit")
     def _check_balanced_constrains(self):
         """Validate balance when a line's own debit/credit is written directly.

@@ -65,29 +65,57 @@
         <field name="arch" type="xml">
             <form string="Journal Entry">
                 <header>
+                    <button
+                        name="action_post"
+                        string="Post"
+                        type="object"
+                        class="oe_highlight"
+                        invisible="state != 'draft'"
+                    />
+                    <button
+                        name="button_draft"
+                        string="Reset to Draft"
+                        type="object"
+                        invisible="not show_reset_to_draft_button"
+                    />
+                    <button
+                        name="button_cancel"
+                        string="Cancel"
+                        type="object"
+                        invisible="state not in ('draft', 'posted')"
+                        confirm="Are you sure you want to cancel this journal entry?"
+                    />
                     <field name="state" widget="statusbar" />
                 </header>
                 <sheet>
                     <div class="oe_title">
                         <label for="name" />
                         <h1>
-                            <field name="name" />
+                            <field
+                                name="name"
+                                readonly="state != 'draft'"
+                                options="{'placeholder_field': 'name_placeholder'}"
+                            />
                         </h1>
                     </div>
+                    <field name="name_placeholder" invisible="1" />
+                    <field name="highest_name" invisible="1" />
                     <group>
                         <group name="main_group">
                             <field
                                 name="journal_id"
                                 domain="[('id', 'in', suitable_journal_ids)]"
+                                readonly="state != 'draft'"
                             />
-                            <field name="date" />
-                            <field name="ref" />
+                            <field name="date" readonly="state != 'draft'" />
+                            <field name="ref" readonly="state != 'draft'" />
                         </group>
                         <group name="secondary_group">
-                            <field name="partner_id" />
+                            <field name="partner_id" readonly="state != 'draft'" />
                             <field
                                 name="currency_id"
                                 groups="base.group_multi_currency"
+                                readonly="state != 'draft'"
                             />
                             <field
                                 name="company_id"
@@ -97,7 +125,7 @@
                     </group>
                     <notebook>
                         <page name="journal_items" string="Journal Items">
-                            <field name="line_ids">
+                            <field name="line_ids" readonly="state != 'draft'">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle" />
                                     <field name="account_id" />
@@ -211,24 +239,33 @@
         <field name="arch" type="xml">
             <form string="Journal Item">
                 <sheet>
+                    <field name="parent_state" invisible="1" />
                     <group>
                         <group name="main_group">
-                            <field name="move_id" />
-                            <field name="date" />
-                            <field name="account_id" />
-                            <field name="partner_id" />
-                            <field name="name" />
+                            <field name="move_id" readonly="parent_state != 'draft'" />
+                            <field name="date" readonly="parent_state != 'draft'" />
+                            <field
+                                name="account_id"
+                                readonly="parent_state != 'draft'"
+                            />
+                            <field
+                                name="partner_id"
+                                readonly="parent_state != 'draft'"
+                            />
+                            <field name="name" readonly="parent_state != 'draft'" />
                         </group>
                         <group name="amount_group">
-                            <field name="debit" />
-                            <field name="credit" />
+                            <field name="debit" readonly="parent_state != 'draft'" />
+                            <field name="credit" readonly="parent_state != 'draft'" />
                             <field
                                 name="currency_id"
                                 groups="base.group_multi_currency"
+                                readonly="parent_state != 'draft'"
                             />
                             <field
                                 name="amount_currency"
                                 groups="base.group_multi_currency"
+                                readonly="parent_state != 'draft'"
                             />
                         </group>
                     </group>

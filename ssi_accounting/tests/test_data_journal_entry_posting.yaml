@@ -1,0 +1,713 @@
+scenarios:
+  - name: "Posting the first entry of a journal numbers it 00001"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 1"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 1A"
+          account_type: "asset_current"
+          code: "JEP1A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 1B"
+          account_type: "income"
+          code: "JEP1B"
+      - step: "Create a draft entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-03-10
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 100.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 100.0
+      - step: "Assert the draft entry has no number yet"
+        action: "assert"
+        target: "entry"
+        asserts:
+          name:
+            type: "value"
+            operator: "is_falsy"
+      - step: "Post the entry"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "posted"
+      - step: "Assert it is numbered 00001"
+        action: "assert"
+        target: "entry"
+        asserts:
+          name:
+            type: "value"
+            operator: "contains"
+            expected: "00001"
+
+  - name: "A second entry in the same journal and year continues the sequence"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 2"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 2A"
+          account_type: "asset_current"
+          code: "JEP2A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 2B"
+          account_type: "income"
+          code: "JEP2B"
+      - step: "Create and post the first entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_1"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-01-10
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 50.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 50.0
+      - step: "Post the first entry"
+        action: "call"
+        target: "entry_1"
+        method: "action_post"
+        as_user: "base.user_admin"
+        asserts:
+          name:
+            type: "value"
+            operator: "contains"
+            expected: "00001"
+      - step: "Create the second entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_2"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-06-20
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 30.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 30.0
+      - step: "Post the second entry"
+        action: "call"
+        target: "entry_2"
+        method: "action_post"
+        as_user: "base.user_admin"
+        asserts:
+          name:
+            type: "value"
+            operator: "contains"
+            expected: "00002"
+
+  - name: "An entry dated the following year resets the sequence"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 3"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 3A"
+          account_type: "asset_current"
+          code: "JEP3A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 3B"
+          account_type: "income"
+          code: "JEP3B"
+      - step: "Create and post an entry dated 2026"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_2026"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-01-15
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 40.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 40.0
+      - step: "Post the 2026 entry"
+        action: "call"
+        target: "entry_2026"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Create and post an entry dated 2027"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_2027"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2027-01-10
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 40.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 40.0
+      - step: "Post the 2027 entry"
+        action: "call"
+        target: "entry_2027"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Assert the 2027 entry restarted at 00001"
+        action: "assert"
+        target: "entry_2027"
+        asserts:
+          name:
+            type: "value"
+            operator: "contains"
+            expected: "00001"
+      - step: "Assert the 2027 entry carries the new year segment"
+        action: "assert"
+        target: "entry_2027"
+        asserts:
+          name:
+            type: "value"
+            operator: "contains"
+            expected: "2027"
+
+  - name: "Two different journals have independent sequences"
+    steps:
+      - step: "Create the first journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_a"
+        values:
+          name: "Posting Journal 4A"
+          type: "general"
+      - step: "Create the second journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal_b"
+        values:
+          name: "Posting Journal 4B"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 4A"
+          account_type: "asset_current"
+          code: "JEP4A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 4B"
+          account_type: "income"
+          code: "JEP4B"
+      - step: "Create and post an entry on the first journal"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_a"
+        values:
+          journal_id: "REC: journal_a.id"
+          date: 2026-04-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 10.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 10.0
+      - step: "Post the entry on the first journal"
+        action: "call"
+        target: "entry_a"
+        method: "action_post"
+        as_user: "base.user_admin"
+        asserts:
+          name:
+            type: "value"
+            operator: "contains"
+            expected: "00001"
+      - step: "Create and post an entry on the second journal"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_b"
+        values:
+          journal_id: "REC: journal_b.id"
+          date: 2026-04-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 20.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 20.0
+      - step: "Post the entry on the second journal (also starts at 00001)"
+        action: "call"
+        target: "entry_b"
+        method: "action_post"
+        as_user: "base.user_admin"
+        asserts:
+          name:
+            type: "value"
+            operator: "contains"
+            expected: "00001"
+
+  - name: "Resetting a posted entry to draft keeps its number"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 5"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 5A"
+          account_type: "asset_current"
+          code: "JEP5A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 5B"
+          account_type: "income"
+          code: "JEP5B"
+      - step: "Create and post an entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-02-05
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 15.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 15.0
+      - step: "Post the entry"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Reset it to draft"
+        action: "call"
+        target: "entry"
+        method: "button_draft"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "draft"
+      - step: "Assert the number and posted_before are kept"
+        action: "assert"
+        target: "entry"
+        refresh: true
+        asserts:
+          name:
+            type: "value"
+            operator: "contains"
+            expected: "00001"
+          posted_before:
+            type: "value"
+            expected: true
+      - step: "Post it again"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "posted"
+      - step: "Cancel the re-posted entry"
+        action: "call"
+        target: "entry"
+        method: "button_cancel"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "cancel"
+
+  - name: "Cancel works from draft and from posted"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 6"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 6A"
+          account_type: "asset_current"
+          code: "JEP6A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 6B"
+          account_type: "income"
+          code: "JEP6B"
+      - step: "Create a draft entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_draft"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-01
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 5.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 5.0
+      - step: "Cancel the draft entry directly"
+        action: "call"
+        target: "entry_draft"
+        method: "button_cancel"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "cancel"
+      - step: "Create a second entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry_posted"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-05-02
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 7.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 7.0
+      - step: "Post the second entry"
+        action: "call"
+        target: "entry_posted"
+        method: "action_post"
+        as_user: "base.user_admin"
+      - step: "Cancel the posted entry"
+        action: "call"
+        target: "entry_posted"
+        method: "button_cancel"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "cancel"
+
+  - name: "Posting an entry with no lines is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 8"
+          type: "general"
+      - step: "Create a lineless draft entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-03-01
+      - step: "Posting it is rejected"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+        expect_error:
+          type: "UserError"
+          message_contains: "no postable line"
+
+  - name: "Posting to an archived journal is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 9"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 9A"
+          account_type: "asset_current"
+          code: "JEP9A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 9B"
+          account_type: "income"
+          code: "JEP9B"
+      - step: "Create a draft entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-03-05
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 12.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 12.0
+      - step: "Archive the journal"
+        action: "write"
+        target: "journal"
+        values:
+          active: false
+      - step: "Posting to it is rejected"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+        expect_error:
+          type: "UserError"
+          message_contains: "archived journal"
+
+  - name: "Posting without the accounting user group is rejected"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 10"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 10A"
+          account_type: "asset_current"
+          code: "JEP10A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 10B"
+          account_type: "income"
+          code: "JEP10B"
+      - step: "Create a draft entry"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-03-06
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 8.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 8.0
+      - step: "Create a user without the accounting group"
+        action: "create"
+        model: "res.users"
+        save_as: "outsider"
+        values:
+          name: "Posting Outsider"
+          login: "posting_outsider@example.com"
+          group_ids: "RECORDSET: base.group_user"
+      - step: "Posting as that user is rejected with an access error"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "outsider"
+        expect_error:
+          type: "AccessError"
+
+  # Kept as the LAST scenario on purpose: it locks 'company' (the shared
+  # 'env.company' alias, not scenario-local) and scenario writes are not
+  # rolled back between scenarios within one test method (only once the
+  # whole method finishes) -- see odoo-development-unit-test's
+  # framework-and-structure.md. Every earlier scenario above posts
+  # entries dated well after 2026-01-31, so this ordering is safe.
+  - name: "Posting inside a locked fiscal period shifts the entry's date"
+    steps:
+      - step: "Create a journal"
+        action: "create"
+        model: "account.journal"
+        save_as: "journal"
+        values:
+          name: "Posting Journal 11"
+          type: "general"
+      - step: "Create the debit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_a"
+        values:
+          name: "Posting Account 11A"
+          account_type: "asset_current"
+          code: "JEP11A"
+      - step: "Create the credit-side account"
+        action: "create"
+        model: "account.account"
+        save_as: "acc_b"
+        values:
+          name: "Posting Account 11B"
+          account_type: "income"
+          code: "JEP11B"
+      - step: "Lock the fiscal year up to 2026-01-31"
+        action: "write"
+        target: "company"
+        values:
+          fiscalyear_lock_date: 2026-01-31
+      - step: "Create an entry dated inside the locked period"
+        action: "create"
+        model: "journal_entry"
+        save_as: "entry"
+        values:
+          journal_id: "REC: journal.id"
+          date: 2026-01-15
+          line_ids:
+            - - 0
+              - 0
+              - account_id: "REC: acc_a.id"
+                debit: 25.0
+                credit: 0.0
+            - - 0
+              - 0
+              - account_id: "REC: acc_b.id"
+                debit: 0.0
+                credit: 25.0
+      - step: "Post it"
+        action: "call"
+        target: "entry"
+        method: "action_post"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "posted"
+      - step: "Assert the date was pushed past the lock date"
+        action: "assert"
+        target: "entry"
+        asserts:
+          date:
+            type: "value"
+            operator: "gt"
+            expected: 2026-01-31
