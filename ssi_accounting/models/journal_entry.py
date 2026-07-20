@@ -472,8 +472,18 @@ class JournalEntry(models.Model):
         self.ensure_one()
         entry_date = self.date or fields.Date.context_today(self)
         year_part = f"{entry_date.year:04d}"
-        last_day = int(self.company_id.fiscalyear_last_day)
-        last_month = int(self.company_id.fiscalyear_last_month)
+        # 'company_id' is related to 'journal_id.company_id', so it is
+        # still empty on a brand new record whose journal has not been
+        # picked yet -- exactly what the form shows right after pressing
+        # New. Fall back to the active company: such an entry
+        # conceptually belongs to it until a journal is chosen, so the
+        # number previewed by 'name_placeholder' is right from the
+        # start. Reading the empty recordset instead would make
+        # 'int(False)' yield month 0 and 'calendar.monthrange' raise
+        # 'IllegalMonthError'.
+        company = self.company_id or self.env.company
+        last_day = int(company.fiscalyear_last_day)
+        last_month = int(company.fiscalyear_last_month)
         is_staggered_year = last_month != 12 or last_day != 31
         if is_staggered_year:
             max_last_day = calendar.monthrange(entry_date.year, last_month)[1]
