@@ -49,5 +49,9 @@
 ## Note
 
 - A journal entry must always be balanced — total Debit must equal total Credit. If the
-  lines entered do not balance, the system adds a balancing line automatically on save
-  rather than rejecting the entry.
+  lines do not balance, saving is rejected with an error listing the entry and the
+  amount it is out by.
+- The entry is balanced automatically **only** when the selected **Journal** has a
+  Suspense Account configured; the difference is then posted to that account instead of
+  the save being rejected. Without a Suspense Account on the journal, the lines must be
+  balanced by hand before saving.

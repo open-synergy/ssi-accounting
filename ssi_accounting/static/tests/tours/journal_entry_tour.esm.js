@@ -116,11 +116,6 @@ registry.category("web_tour.tours").add("ssi_accounting_journal_entry_create", {
             run: "edit Tour debit line",
         },
         {
-            content: "Fill in the Debit amount",
-            trigger: ".o_selected_row .o_field_widget[name='debit'] input",
-            run: "edit 100.00",
-        },
-        {
             content: "Add the credit line",
             trigger: ".o_field_x2many .o_field_x2many_list_row_add a",
             run: "click",
@@ -140,10 +135,47 @@ registry.category("web_tour.tours").add("ssi_accounting_journal_entry_create", {
             trigger: ".o_selected_row .o_field_widget[name='name'] input",
             run: "edit Tour credit line",
         },
+        // Amounts are entered LAST, and only once both accounts are set.
+        // Filling an amount leaves the entry unbalanced, which makes
+        // '_sync_balancing_lines' fire a burst of onchange calls that
+        // re-render the o2m list -- and that re-render destroys any open
+        // autocomplete dropdown. Selecting the second account while that
+        // burst is in flight is exactly the race that made this tour flaky.
+        // Rows are addressed by their label rather than by index, because the
+        // balancing line the model inserts shifts row positions.
+        {
+            content: "Select the debit line",
+            trigger:
+                ".o_data_row:contains(Tour debit line) .o_field_cell[name='debit']",
+            run: "click",
+        },
+        {
+            content: "Fill in the Debit amount",
+            trigger: ".o_selected_row .o_field_widget[name='debit'] input",
+            run: "edit 100.00",
+        },
+        {
+            content: "Select the credit line",
+            trigger:
+                ".o_data_row:contains(Tour credit line) .o_field_cell[name='credit']",
+            run: "click",
+        },
         {
             content: "Fill in the Credit amount",
             trigger: ".o_selected_row .o_field_widget[name='credit'] input",
             run: "edit 100.00",
+        },
+        {
+            // The last edited cell must be committed before saving, otherwise
+            // its value never reaches the record and the entry saves
+            // unbalanced -- the debit cell above only escapes this because
+            // selecting the credit row blurs it. Committing by clicking an
+            // existing cell rather than 'press Tab': tabbing out of the last
+            // cell of an editable="bottom" list opens a new empty row, which
+            // leaves the form dirty and makes the tour fail on teardown.
+            content: "Commit the amount by selecting the debit line again",
+            trigger: ".o_data_row:contains(Tour debit line) .o_field_cell[name='name']",
+            run: "click",
         },
 
         // -- Flow 6 -- Click Save
